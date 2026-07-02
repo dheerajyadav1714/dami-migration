@@ -158,10 +158,15 @@ def get_orchestrator_response(query):
                 bq_client = bigquery.Client(project=project_id)
                 result_df = bq_client.query(sql_query).to_dataframe()
                 if not result_df.empty:
-                    st.session_state["_last_sql_query"] = sql_query
-                    st.session_state["_last_sql_result"] = result_df
+                    # Embed results directly into response as markdown table
+                    response_text += "\n\n📊 **Live BigQuery Result:**\n\n"
+                    response_text += result_df.head(20).to_markdown(index=False)
+                    if len(result_df) > 20:
+                        response_text += f"\n\n*Showing 20 of {len(result_df)} rows.*"
+                else:
+                    response_text += "\n\n*Query returned 0 rows.*"
             except Exception as sql_err:
-                response_text += f"\n\n⚠️ *SQL execution note: {sql_err}*"
+                response_text += f"\n\n⚠️ *SQL execution error: {sql_err}*"
         
         return response_text
         
@@ -179,6 +184,41 @@ def get_orchestrator_response(query):
         except:
             return "I'm currently experiencing connectivity issues with the AI backend. Please try again in a moment."
 
+# Large pool of suggestions organized by category
+ALL_SUGGESTIONS = [
+    # Discovery
+    ("📊", "How many servers have been discovered?"),
+    ("🖥️", "Show server breakdown by OS type"),
+    ("🔌", "Which servers are powered off?"),
+    ("📦", "What workload types are in the inventory?"),
+    # Risk
+    ("⚠️", "What are the high-risk workloads?"),
+    ("🛡️", "Which servers need HIPAA compliance?"),
+    ("📉", "Show servers with highest complexity scores"),
+    ("🔄", "Which servers are recommended for Refactor?"),
+    # Dependencies
+    ("🔗", "Are there circular dependencies?"),
+    ("🕸️", "Which server has the most dependencies?"),
+    ("🧩", "Show shared infrastructure services"),
+    # Waves
+    ("📋", "Which servers are in Wave 1?"),
+    ("🌊", "How many servers are in each wave?"),
+    ("⏱️", "Which wave has the most estimated hours?"),
+    ("📐", "Explain the wave sequencing logic"),
+    # Architecture
+    ("🏗️", "What GCP services are recommended?"),
+    ("💻", "Show the target machine types for all servers"),
+    ("☁️", "How many servers map to GKE vs Compute Engine?"),
+    # Cost
+    ("💰", "Show estimated annual savings"),
+    ("🔄", "Compare on-prem vs cloud costs by service"),
+    ("📈", "What optimizations can reduce cost further?"),
+    ("💵", "What is the average monthly cost per server?"),
+    # IaC
+    ("🔧", "What IaC artifacts have been generated?"),
+    ("📝", "How is the Terraform structured for Wave 1?"),
+]
+
 def render():
     st.markdown("<h1 class='gradient-text'>Conversational Migration Assistant</h1>", unsafe_allow_html=True)
     st.write("Interact with D.A.M.I using natural language queries to fetch migration statistics, check dependencies, and get architectural recommendations.")
@@ -190,59 +230,25 @@ def render():
             {"role": "assistant", "content": "Hello! I am D.A.M.I. I have access to your VMware discovery inventory, dependency graph, risk scores, and wave plan in BigQuery. How can I assist you with your Google Cloud migration planning today?"}
         ]
         
-    # Render chat history (with SQL results if stored)
-    for idx, message in enumerate(st.session_state.messages):
+    # Render chat history
+    for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-            # Show stored SQL results for this message
-            result_key = f"_sql_result_{idx}"
-            query_key = f"_sql_query_{idx}"
-            if result_key in st.session_state:
-                st.caption("📊 **Live BigQuery Result:**")
-                st.dataframe(st.session_state[result_key], use_container_width=True, hide_index=True)
-                if query_key in st.session_state:
-                    with st.expander("🔍 View SQL Query"):
-                        st.code(st.session_state[query_key], language="sql")
-            
-    # Dynamic context-aware suggestions
-    def get_dynamic_suggestions():
-        """Generate suggestions based on current data state and conversation."""
-        context = get_bq_context()
-        msg_count = len(st.session_state.get("messages", []))
-        suggestions = []
-        
-        # Phase 1: Discovery questions (if few messages)
-        if msg_count <= 2:
-            suggestions = [
-                ("📊", "How many servers have been discovered?"),
-                ("🔗", "Show circular dependencies"),
-                ("💰", "Show estimated savings"),
-                ("🏗️", "What GCP services are recommended?")
-            ]
-        # Phase 2: After a few interactions — deeper analysis
-        elif msg_count <= 6:
-            suggestions = [
-                ("📋", "Which servers are in Wave 1?"),
-                ("⚠️", "What are the high-risk workloads?"),
-                ("📐", "Explain the wave sequencing logic"),
-                ("💻", "How is the Terraform structured?")
-            ]
-        # Phase 3: Advanced queries
-        else:
-            suggestions = [
-                ("🔄", "Compare on-prem vs cloud costs by service"),
-                ("🛡️", "Which servers need HIPAA compliance?"),
-                ("📈", "What optimizations can reduce cost further?"),
-                ("🌊", "Which wave has the most dependencies?")
-            ]
-        
-        # Override with cost-specific if no cost data
-        if not context.get("cost_estimates"):
-            suggestions[2] = ("🏗️", "Run target architecture mapping")
-        
-        return suggestions
     
-    suggestions = get_dynamic_suggestions()
+    # Dynamic suggestions — filter out already-asked questions
+    asked_questions = {m["content"].lower() for m in st.session_state.messages if m["role"] == "user"}
+    available = [(icon, q) for icon, q in ALL_SUGGESTIONS if q.lower() not in asked_questions]
+    
+    # Pick 4 suggestions, cycling through the pool based on conversation length
+    msg_count = len(st.session_state.messages)
+    offset = (msg_count // 2) * 4  # Shift by 4 every 2 messages
+    if len(available) >= 4:
+        start = offset % len(available)
+        suggestions = []
+        for i in range(4):
+            suggestions.append(available[(start + i) % len(available)])
+    else:
+        suggestions = available[:4] if available else [("💬", "Tell me about the migration plan")]
     
     st.write(" ")
     st.caption("💡 Suggested Queries:")
@@ -250,50 +256,27 @@ def render():
     cols = st.columns(len(suggestions))
     for i, (icon, query_text) in enumerate(suggestions):
         with cols[i]:
-            if st.button(f"{icon} {query_text}", key=f"suggest_{i}"):
+            if st.button(f"{icon} {query_text}", key=f"suggest_{i}_{msg_count}"):
                 st.session_state.messages.append({"role": "user", "content": query_text})
-                response = get_orchestrator_response(query_text)
+                with st.spinner("⏳ Querying BigQuery and analyzing with Gemini..."):
+                    response = get_orchestrator_response(query_text)
                 st.session_state.messages.append({"role": "assistant", "content": response})
-                # Persist SQL results keyed to this message index
-                msg_idx = len(st.session_state.messages) - 1
-                if "_last_sql_result" in st.session_state:
-                    st.session_state[f"_sql_result_{msg_idx}"] = st.session_state.pop("_last_sql_result")
-                if "_last_sql_query" in st.session_state:
-                    st.session_state[f"_sql_query_{msg_idx}"] = st.session_state.pop("_last_sql_query")
                 st.rerun()
             
     # Chat Input
     if prompt := st.chat_input("Ask D.A.M.I a question..."):
-        # User message
+        # Add user message to history
         st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        # Show spinner while getting response, then add to history and rerun
         with st.chat_message("user"):
             st.markdown(prompt)
-            
-        # Assistant response
         with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            message_placeholder.markdown("⏳ Querying BigQuery and analyzing with Gemini...")
-            
-            response = get_orchestrator_response(prompt)
-            message_placeholder.markdown(response)
-            
-            # Show SQL query results if generated
-            if "_last_sql_result" in st.session_state:
-                st.caption("📊 **Live BigQuery Result:**")
-                st.dataframe(st.session_state["_last_sql_result"], use_container_width=True, hide_index=True)
-                if "_last_sql_query" in st.session_state:
-                    with st.expander("🔍 View SQL Query"):
-                        st.code(st.session_state["_last_sql_query"], language="sql")
-            
+            with st.spinner("⏳ Querying BigQuery and analyzing with Gemini..."):
+                response = get_orchestrator_response(prompt)
+            st.markdown(response)
+        
         st.session_state.messages.append({"role": "assistant", "content": response})
-        # Persist SQL results keyed to this message index
-        msg_idx = len(st.session_state.messages) - 1
-        if "_last_sql_result" in st.session_state:
-            st.session_state[f"_sql_result_{msg_idx}"] = st.session_state.pop("_last_sql_result")
-        if "_last_sql_query" in st.session_state:
-            st.session_state[f"_sql_query_{msg_idx}"] = st.session_state.pop("_last_sql_query")
-        st.rerun()
 
 if __name__ == "__main__":
     render()
-

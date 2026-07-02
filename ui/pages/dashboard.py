@@ -7,6 +7,7 @@ import streamlit as st
 from google.cloud import bigquery
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 
 def get_project_stats(project_id, dataset):
     client = bigquery.Client(project=project_id)
@@ -551,7 +552,6 @@ def render():
         """).to_dataframe()
         
         if not bench_df.empty:
-            import plotly.express as px
             
             gpu_col, chart_col = st.columns([1, 2])
             
@@ -588,7 +588,6 @@ def render():
             
             with chart_col:
                 # Dual-axis bar chart: Pandas vs cuDF processing time
-                import plotly.graph_objects as go
                 
                 fig = go.Figure()
                 

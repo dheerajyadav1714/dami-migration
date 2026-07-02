@@ -184,8 +184,55 @@ def _load_chat_from_bq() -> list:
         pass
     return []
 
+
+# ===========================================================================
+# Intelligent LLM Model Routing
+# ===========================================================================
+
+# Keywords that indicate complex reasoning tasks
+_COMPLEX_KEYWORDS = {
+    "architecture", "design", "terraform", "kubernetes", "refactor",
+    "recommend", "analyze", "compare", "explain why", "migration strategy",
+    "replatform", "optimize", "trade-off", "tradeoff", "risk mitigation",
+    "rollback", "runbook", "compliance", "hipaa", "pci", "security",
+    "cost optimization", "finops", "forecast", "predict", "evaluate",
+    "best approach", "should we", "pros and cons", "what if",
+    "infrastructure as code", "iac", "ansible", "helm",
+    "circular dependency", "bottleneck", "root cause",
+}
+
+# Keywords that indicate simple data lookup tasks
+_SIMPLE_KEYWORDS = {
+    "how many", "count", "list", "show", "total", "status",
+    "what is", "which servers", "powered off", "powered on",
+    "breakdown", "distribution", "summary", "wave 1", "wave 2",
+}
+
+def classify_complexity(query: str) -> tuple:
+    """Classify query complexity and return (model_name, model_label, reasoning).
+    
+    Returns:
+        tuple: (model_name, badge_emoji, short_reason)
+    """
+    q_lower = query.lower().strip()
+    
+    # Score complexity
+    complex_hits = sum(1 for kw in _COMPLEX_KEYWORDS if kw in q_lower)
+    simple_hits = sum(1 for kw in _SIMPLE_KEYWORDS if kw in q_lower)
+    
+    # Long queries with multiple sentences are usually complex
+    word_count = len(q_lower.split())
+    if word_count > 25:
+        complex_hits += 1
+    
+    # Route decision
+    if complex_hits >= 2 or (complex_hits >= 1 and simple_hits == 0 and word_count > 10):
+        return ("gemini-2.5-pro", "🧠", "Complex reasoning → Gemini 2.5 Pro")
+    else:
+        return ("gemini-2.5-flash", "⚡", "Data lookup → Gemini 2.5 Flash")
+
 def get_orchestrator_response(query):
-    """Route all queries through Gemini grounded on live BigQuery data."""
+    """Route queries through the appropriate Gemini model based on complexity."""
     project_id = os.getenv("GCP_PROJECT_ID")
     dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
     
@@ -195,7 +242,9 @@ def get_orchestrator_response(query):
         
         vertex_project = os.getenv("VERTEX_PROJECT_ID", "gcp-experiments-490315")
         location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
-        model_name = "gemini-2.5-flash"
+        
+        # Intelligent model routing based on query complexity
+        model_name, model_badge, model_reason = classify_complexity(query)
         
         # Try API key first, then enterprise (Vertex AI)
         api_key = os.getenv("GEMINI_API_KEY")
@@ -271,6 +320,10 @@ def get_orchestrator_response(query):
         )
         
         response_text = response.text
+        
+        # Prepend model routing badge
+        model_tag = f"> {model_badge} **{model_reason}** | Model: `{model_name}`\n\n"
+        response_text = model_tag + response_text
         
         # Extract and execute SQL if Gemini generated one
         import re

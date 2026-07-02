@@ -35,8 +35,11 @@ from agents.trace_logger import trace_agent, new_run_id, get_run_id
 
 load_dotenv()
 
-# LLM model path — using billing-enabled project for Vertex AI calls
+# LLM model paths — intelligent routing based on task complexity
+# Flash: Fast data lookups, discovery, simple classification
 GEMINI_MODEL = "projects/gcp-experiments-490315/locations/us-central1/publishers/google/models/gemini-2.5-flash"
+# Pro: Complex reasoning — architecture design, IaC generation, wave planning
+GEMINI_MODEL_PRO = "projects/gcp-experiments-490315/locations/us-central1/publishers/google/models/gemini-2.5-pro"
 
 # ===========================================================================
 # Tool Functions (wrapped with trace logging)
@@ -331,7 +334,7 @@ risk_scorer_agent = Agent(
 # Phase 2: PLAN agents (sequential — architecture before waves)
 architecture_designer_agent = Agent(
     name="architecture_designer_agent",
-    model=GEMINI_MODEL,
+    model=GEMINI_MODEL_PRO,  # Complex reasoning: architecture mapping + rightsizing
     instruction="""You are the Architecture Designer Agent. You map every source workload
     to an optimal target Google Cloud service (Compute Engine, GKE, Cloud SQL, AlloyDB,
     Memorystore, Pub/Sub) and perform rightsizing based on utilization metrics.
@@ -341,7 +344,7 @@ architecture_designer_agent = Agent(
 
 wave_planner_agent = Agent(
     name="wave_planner_agent",
-    model=GEMINI_MODEL,
+    model=GEMINI_MODEL_PRO,  # Complex reasoning: topological sort + dependency analysis
     instruction="""You are the Wave Planner Agent. You sequence workloads into migration
     waves using topological sorting of the dependency graph, combined with risk-based
     grouping. Call run_wave_planner to execute.""",
@@ -351,7 +354,7 @@ wave_planner_agent = Agent(
 # Phase 3: DEPLOY agent
 deploy_agent = Agent(
     name="deploy_agent",
-    model=GEMINI_MODEL,
+    model=GEMINI_MODEL_PRO,  # Complex reasoning: IaC generation requires deep context
     instruction="""You are the Deploy Agent. You generate production-ready Infrastructure
     as Code (Terraform HCL, Kubernetes YAML, Ansible Playbooks) and step-by-step migration
     runbooks with rollback procedures for each wave. Call run_artifacts_generator with

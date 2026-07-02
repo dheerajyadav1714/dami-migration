@@ -264,7 +264,7 @@ def render():
         shared = analysis["shared_services"]
         if shared:
             for s in shared:
-                st.info(f"**{s['name']}** ({s['type'].upper()}) - referenced by {s['in_degree']} workloads.")
+                st.info(f"**{s['name']}** ({(s.get('type') or 'unknown').upper()}) - referenced by {s.get('in_degree', 0)} workloads.")
         else:
             st.write("None detected.")
             

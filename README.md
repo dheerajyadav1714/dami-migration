@@ -2,7 +2,7 @@
 
 > **AI-powered enterprise cloud migration accelerator** that replaces months of manual consulting with an autonomous multi-agent pipeline, GPU-accelerated data processing, and intelligent decision support.
 
-![Python](https://img.shields.io/badge/Python-3.11-blue)
+![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.58-red)
 ![Google Cloud](https://img.shields.io/badge/Google%20Cloud-BigQuery%20%7C%20Vertex%20AI%20%7C%20Cloud%20Run-4285F4)
 ![NVIDIA](https://img.shields.io/badge/NVIDIA-RAPIDS%20cuDF-76B900)

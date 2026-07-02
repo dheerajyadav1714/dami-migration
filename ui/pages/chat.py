@@ -80,137 +80,104 @@ def get_bq_context():
     return context
 
 def get_orchestrator_response(query):
-    query_lower = query.lower()
+    """Route all queries through Gemini grounded on live BigQuery data."""
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
     
-    # 1. If it is a database statistic or status query, use direct keyless RAG grounded on BigQuery metrics
-    is_db_query = any(w in query_lower for w in ["how many", "count", "discovered", "savings", "cost", "risk", "wave", "migration", "gcp", "target", "servers", "database", "vm", "orchestrator", "hcl", "terraform"])
-    
-    if is_db_query:
-        try:
-            from google.genai import Client
-            from google.genai import types
-            
-            project_id = os.getenv("GCP_PROJECT_ID")
-            vertex_project = os.getenv("VERTEX_PROJECT_ID", "gcp-experiments-490315")
-            location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
-            model_name = "gemini-2.5-flash"
-            
-            client = Client(enterprise=True)
-            model_path = f"projects/{vertex_project}/locations/{location}/publishers/google/models/{model_name}"
-            
-            context = get_bq_context()
-            
-            system_instruction = (
-                "You are D.A.M.I. (Discovery & Autonomous Migration Intelligence) Conversational Assistant. "
-                "Your task is to answer the user's questions regarding VMware to Google Cloud migration, "
-                "infrastructure discovery, dependencies, risk assessment, target sizing, and wave plans. "
-                "Ground your answers in the active BigQuery migration database context provided below. "
-                "Keep your responses concise, technical, and professional.\n\n"
-                "IMPORTANT: If the user asks a quantitative question about the data, generate a BigQuery SQL query "
-                "to answer it. Wrap the SQL in ```sql ... ``` code block. Use the following table schemas:\n"
-                f"- `{os.getenv('GCP_PROJECT_ID')}.{os.getenv('BIGQUERY_DATASET', 'dami_data')}.servers` (server_id, name, ip_address, os, cpu_cores, ram_gb, disk_gb, environment, workload_type, compliance_flags, tags)\n"
-                f"- `{os.getenv('GCP_PROJECT_ID')}.{os.getenv('BIGQUERY_DATASET', 'dami_data')}.risk_scores` (server_id, risk_level, overall_risk_score, recommended_strategy)\n"
-                f"- `{os.getenv('GCP_PROJECT_ID')}.{os.getenv('BIGQUERY_DATASET', 'dami_data')}.waves` (wave_id, wave_number, wave_name)\n"
-                f"- `{os.getenv('GCP_PROJECT_ID')}.{os.getenv('BIGQUERY_DATASET', 'dami_data')}.target_architecture` (server_id, target_gcp_service, machine_type, estimated_monthly_cost)\n"
-                f"- `{os.getenv('GCP_PROJECT_ID')}.{os.getenv('BIGQUERY_DATASET', 'dami_data')}.dependencies` (source_id, target_id, protocol, port)\n"
-            )
-            
-            prompt = f"""
-            Answer the user's query grounding your details in the active BigQuery migration database context:
-            
-            ### BigQuery Database Live Context
-            - Total Discovered Servers: {context['discovered_servers']}
-            - Mapped target service distribution: {json.dumps(context['target_architecture'])}
-            - Risk Level distribution: {json.dumps(context['risk_distribution'])}
-            - Mapped Wave workload breakdown: {json.dumps(context['waves_breakdown'])}
-            - Cost Estimates & Savings: {json.dumps(context['cost_estimates'])}
-            
-            ### User Query
-            "{query}"
-            """
-            
-            response = client.models.generate_content(
-                model=model_path,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.2
-                )
-            )
-            
-            response_text = response.text
-            
-            # Extract and execute SQL if present in the response
-            import re
-            sql_match = re.search(r'```sql\s*(.*?)\s*```', response_text, re.DOTALL)
-            if sql_match:
-                sql_query = sql_match.group(1).strip()
-                try:
-                    bq_client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
-                    result_df = bq_client.query(sql_query).to_dataframe()
-                    if not result_df.empty:
-                        # Store for display in chat
-                        st.session_state["_last_sql_query"] = sql_query
-                        st.session_state["_last_sql_result"] = result_df
-                except Exception as sql_err:
-                    response_text += f"\n\n⚠️ *SQL execution note: {sql_err}*"
-            
-            return response_text
-        except Exception as e:
-            print(f"Local Vertex AI keyless grounded query failed: {e}")
-            
-    # 2. Otherwise, fall back to FastAPI orchestrator running ADK Runner
     try:
-        response = requests.post(
-            "http://localhost:8000/api/run-orchestrator",
-            json={"prompt": query},
-            timeout=15
-        )
-        if response.status_code == 200:
-            result = response.json()
-            tools = result.get("triggered_tools", [])
-            response_text = result.get("final_response", "")
-            if tools:
-                tool_prefix = "🔧 **Orchestrator Actions Triggered:** " + ", ".join([f"`{t}`" for t in tools]) + "\n\n"
-                return tool_prefix + response_text
-            if response_text:
-                return response_text
-    except Exception as e:
-        print(f"FastAPI orchestrator call bypassed/failed: {e}")
+        from google.genai import Client
+        from google.genai import types
         
-    # 3. Third: Fallback to mock text if model calls are unreachable
-    query_lower = query.lower()
-    if "wave 1" in query_lower:
-        return """**Wave 1 (Core Web & Frontend Services)** consists of 3 servers:
-- **LB-NGINX-01** (Load balancer)
-- **WEBAPP-PROD-01** (Web server)
-- **WEBAPP-PROD-02** (Web server)
+        vertex_project = os.getenv("VERTEX_PROJECT_ID", "gcp-experiments-490315")
+        location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
+        model_name = "gemini-2.5-flash"
+        
+        client = Client(enterprise=True)
+        model_path = f"projects/{vertex_project}/locations/{location}/publishers/google/models/{model_name}"
+        
+        context = get_bq_context()
+        
+        system_instruction = (
+            "You are D.A.M.I. (Discovery & Autonomous Migration Intelligence) Conversational Assistant. "
+            "You help migration architects with VMware-to-Google Cloud migration planning. "
+            "Ground ALL answers in the live BigQuery migration database context provided. "
+            "Be concise, technical, and professional. Use markdown formatting.\n\n"
+            "When the user asks a quantitative question, generate a BigQuery SQL query inside ```sql ... ``` blocks. "
+            "Use ONLY these verified table schemas:\n"
+            f"- `{project_id}.{dataset}.servers` — columns: server_id, name, vcpu, ram_gb, disk_gb, os, os_version, "
+            "ip_address, cluster, datacenter, power_state, cpu_utilization_avg, ram_utilization_avg, "
+            "workload_type, app_owner, environment, source_platform, compliance_flags, risk_level\n"
+            f"- `{project_id}.{dataset}.risk_scores` — columns: server_id, overall_risk_score, risk_level, "
+            "complexity_score, dependency_risk, data_sensitivity, business_criticality, recommended_strategy, "
+            "migration_effort_days, risk_factors, mitigation_plan\n"
+            f"- `{project_id}.{dataset}.waves` — columns: wave_id, wave_number, wave_name, risk_level, "
+            "start_date, end_date, prerequisites, rollback_strategy, success_criteria\n"
+            f"- `{project_id}.{dataset}.wave_workloads` — columns: wave_id, server_id, sequence_in_wave, "
+            "migration_approach, target_gcp_service, target_machine_type, target_region, estimated_hours\n"
+            f"- `{project_id}.{dataset}.target_architecture` — columns: source_component_id, source_component_name, "
+            "source_type, target_gcp_service, target_resource_name, target_machine_type, target_configuration, "
+            "rightsizing_recommendation, cost_estimate_monthly, ai_reasoning\n"
+            f"- `{project_id}.{dataset}.app_dependencies` — columns: source_app_id, target_app_id, dependency_type, "
+            "protocol, port, criticality\n"
+            f"- `{project_id}.{dataset}.applications` — columns: app_id, name, tier, business_unit, owner\n"
+            f"- `{project_id}.{dataset}.databases` — columns: database_id, name, engine, version, size_gb, server_id\n"
+            f"- `{project_id}.{dataset}.iac_artifacts` — columns: artifact_id, wave_id, artifact_type, file_name, "
+            "content_preview, resource_count, validated\n"
+        )
+        
+        prompt = f"""Answer the user's query using the live BigQuery migration database context:
 
-**Rationale:** These frontend servers have no incoming dependencies from other application workloads (they receive traffic directly from the internet/users). Migrating them first helps establish the web tier.
+### Database Live Context
+- Total Discovered Servers: {context['discovered_servers']}
+- Target Service Distribution: {json.dumps(context['target_architecture'])}
+- Risk Level Distribution: {json.dumps(context['risk_distribution'])}
+- Wave Workload Breakdown: {json.dumps(context['waves_breakdown'])}
+- Cost Estimates & Savings: {json.dumps(context['cost_estimates'])}
 
-**Next Steps:** Rehost to Google Compute Engine. You can view and download the generated Terraform HCL, Ansible configuration, and Runbooks in the **IaC & Runbooks** page."""
-
-    elif "circular" in query_lower or "loop" in query_lower:
-        return """Yes, I detected **1 circular dependency loop** in the active workloads:
-`payment-gateway (app-0001) ➔ order-processing (app-0002) ➔ payment-gateway (app-0001)`
-
-**Details:**
-- `app-0001` (payment-gateway) calls `app-0002` (order-processing) over HTTPS (port 443).
-- `app-0002` (order-processing) calls `app-0001` (payment-gateway) over HTTP (port 8080) for ledger callbacks.
-
-**Impact on Migration:** 
-Tightly coupled loops must be migrated in the **same wave** (scheduled in Wave 3) to prevent inter-network latency and security failures during transitional states."""
-
-    elif "savings" in query_lower or "cost" in query_lower:
-        return """Based on my analysis, the projected annual savings are **$1,210,080** (a **57.6%** reduction in Total Cost of Ownership).
-
-**Key Optimization Factors:**
-1. **vCPU Rightsizing:** Total cores reduced from 74 to 46 (saves ~$24,000/mo).
-2. **Oracle DBMS to BMS:** Saves licensing audit risk and optimizes core density.
-3. **VM consolidation:** Moving web app servers to Auto-scaling Managed Instance Groups (saves ~$12,000/mo)."""
-
-    else:
-        return f"I received your query: '{query}'. I have access to your VMware discovery inventory, dependency graph, risk scores, and wave plan in BigQuery. Please ask about discovered counts, target architecture costs, or scheduling waves."
+### User Query
+"{query}"
+"""
+        
+        response = client.models.generate_content(
+            model=model_path,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.3
+            )
+        )
+        
+        response_text = response.text
+        
+        # Extract and execute SQL if Gemini generated one
+        import re
+        sql_match = re.search(r'```sql\s*(.*?)\s*```', response_text, re.DOTALL)
+        if sql_match:
+            sql_query = sql_match.group(1).strip()
+            try:
+                bq_client = bigquery.Client(project=project_id)
+                result_df = bq_client.query(sql_query).to_dataframe()
+                if not result_df.empty:
+                    st.session_state["_last_sql_query"] = sql_query
+                    st.session_state["_last_sql_result"] = result_df
+            except Exception as sql_err:
+                response_text += f"\n\n⚠️ *SQL execution note: {sql_err}*"
+        
+        return response_text
+        
+    except Exception as e:
+        print(f"Gemini query failed: {e}")
+        # Graceful fallback with BQ context summary
+        try:
+            context = get_bq_context()
+            return (
+                f"I have access to your migration database with **{context['discovered_servers']} discovered servers**, "
+                f"mapped across **{len(context.get('waves_breakdown', []))} waves**. "
+                f"The estimated annual cloud cost savings is **${context.get('cost_estimates', {}).get('estimated_annual_savings', 'N/A'):,.0f}**.\n\n"
+                f"I was unable to generate a detailed AI response at this time. Please try again or ask a more specific question about your migration data."
+            )
+        except:
+            return "I'm currently experiencing connectivity issues with the AI backend. Please try again in a moment."
 
 def render():
     st.markdown("<h1 class='gradient-text'>Conversational Migration Assistant</h1>", unsafe_allow_html=True)

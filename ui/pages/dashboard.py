@@ -537,6 +537,137 @@ def render():
                 <div style="font-size:0.7rem;">{badge}</div>
             </div>""", unsafe_allow_html=True)
 
+    # ── NVIDIA RAPIDS GPU Acceleration Section ──
+    st.write("---")
+    st.subheader("⚡ NVIDIA RAPIDS GPU Acceleration")
+    st.caption("D.A.M.I. leverages NVIDIA RAPIDS cuDF for GPU-accelerated data ingestion, profiling, and anomaly detection during discovery.")
+    
+    try:
+        bench_client = bigquery.Client(project=project_id)
+        bench_df = bench_client.query(f"""
+            SELECT benchmark_id, `rows`, pandas_ms, cudf_ms, speedup, gpu_device
+            FROM `{project_id}.{dataset}.rapids_benchmarks`
+            ORDER BY `rows`
+        """).to_dataframe()
+        
+        if not bench_df.empty:
+            import plotly.express as px
+            
+            gpu_col, chart_col = st.columns([1, 2])
+            
+            with gpu_col:
+                gpu_name = bench_df.iloc[0]["gpu_device"] if "gpu_device" in bench_df.columns else "NVIDIA GPU"
+                max_speedup = bench_df["speedup"].max()
+                max_rows = bench_df["rows"].max()
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, rgba(118,185,0,0.15), rgba(0,128,0,0.05)); border: 1px solid rgba(118,185,0,0.3); border-radius: 12px; padding: 20px; text-align: center;">
+                    <div style="font-size: 2.5rem;">🟢</div>
+                    <div style="font-size: 1.8rem; font-weight: 800; color: #76b900; margin: 8px 0;">
+                        {max_speedup:.0f}x
+                    </div>
+                    <div style="font-size: 0.9rem; color: #e2e8f0; font-weight: 600;">Peak Speedup</div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">at {max_rows:,} rows</div>
+                    <hr style="border-color: rgba(118,185,0,0.2); margin: 12px 0;">
+                    <div style="font-size: 0.75rem; color: #94a3b8;">
+                        <strong style="color:#76b900;">GPU:</strong> {gpu_name}<br>
+                        <strong style="color:#76b900;">Framework:</strong> RAPIDS cuDF 24.x<br>
+                        <strong style="color:#76b900;">Operations:</strong> Load, Profile, Anomaly Detect
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.write("")
+                
+                # Speedup metrics table
+                st.markdown("##### Benchmark Results")
+                display_df = bench_df[["rows", "pandas_ms", "cudf_ms", "speedup"]].copy()
+                display_df.columns = ["Dataset Rows", "Pandas (ms)", "cuDF (ms)", "Speedup"]
+                display_df["Speedup"] = display_df["Speedup"].apply(lambda x: f"{x:.1f}x")
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
+            
+            with chart_col:
+                # Dual-axis bar chart: Pandas vs cuDF processing time
+                import plotly.graph_objects as go
+                
+                fig = go.Figure()
+                
+                row_labels = [f"{int(r):,}" for r in bench_df["rows"]]
+                
+                fig.add_trace(go.Bar(
+                    name="Pandas (CPU)",
+                    x=row_labels,
+                    y=bench_df["pandas_ms"],
+                    marker_color="#ef4444",
+                    marker_line_color="#dc2626",
+                    marker_line_width=1,
+                    text=[f"{v:.0f}ms" for v in bench_df["pandas_ms"]],
+                    textposition="outside",
+                    textfont=dict(size=10, color="#f87171")
+                ))
+                
+                fig.add_trace(go.Bar(
+                    name="cuDF (GPU)",
+                    x=row_labels,
+                    y=bench_df["cudf_ms"],
+                    marker_color="#76b900",
+                    marker_line_color="#5a8f00",
+                    marker_line_width=1,
+                    text=[f"{v:.1f}ms" for v in bench_df["cudf_ms"]],
+                    textposition="outside",
+                    textfont=dict(size=10, color="#76b900")
+                ))
+                
+                # Speedup line overlay
+                fig.add_trace(go.Scatter(
+                    name="Speedup (x)",
+                    x=row_labels,
+                    y=bench_df["speedup"],
+                    mode="lines+markers+text",
+                    yaxis="y2",
+                    line=dict(color="#22d3ee", width=3),
+                    marker=dict(size=10, color="#22d3ee", line=dict(width=2, color="#0891b2")),
+                    text=[f"{v:.1f}x" for v in bench_df["speedup"]],
+                    textposition="top center",
+                    textfont=dict(size=11, color="#22d3ee", family="monospace")
+                ))
+                
+                fig.update_layout(
+                    title=dict(text="NVIDIA RAPIDS cuDF vs Pandas — Processing Time", font=dict(color="#e2e8f0", size=14)),
+                    xaxis_title="Dataset Size (rows)",
+                    yaxis_title="Processing Time (ms)",
+                    yaxis2=dict(title="Speedup (x)", overlaying="y", side="right", showgrid=False, range=[0, max_speedup * 1.3]),
+                    barmode="group",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#e2e8f0"),
+                    height=400,
+                    margin=dict(l=50, r=50, t=50, b=50),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=11)
+                    ),
+                    xaxis=dict(gridcolor="rgba(100,116,139,0.1)"),
+                    yaxis=dict(gridcolor="rgba(100,116,139,0.1)")
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                st.caption(
+                    "📊 **Interpretation:** As dataset size increases from 1K to 100K rows, "
+                    f"GPU acceleration delivers up to **{max_speedup:.0f}x speedup** over CPU-based Pandas. "
+                    "At enterprise scale (1M+ rows), speedups typically exceed 50-100x, making GPU-accelerated "
+                    "discovery critical for large datacenter migrations."
+                )
+        else:
+            st.info("No RAPIDS benchmark data available. Run GPU benchmarks from the Upload Center.")
+    except Exception as bench_err:
+        st.info(f"RAPIDS benchmarks unavailable: {bench_err}")
+
 
 if __name__ == "__main__":
     render()

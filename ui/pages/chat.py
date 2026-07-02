@@ -240,7 +240,7 @@ def get_orchestrator_response(query):
         from google.genai import Client
         from google.genai import types
         
-        vertex_project = os.getenv("VERTEX_PROJECT_ID", "gcp-experiments-490315")
+        vertex_project = os.getenv("VERTEX_PROJECT_ID", os.getenv("GCP_PROJECT_ID", "cohort-2-497207"))
         location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
         
         # Intelligent model routing based on query complexity
@@ -400,7 +400,32 @@ ALL_SUGGESTIONS = [
 ]
 
 def render():
-    st.markdown("<h1 class='gradient-text'>Conversational Migration Assistant</h1>", unsafe_allow_html=True)
+    # Title row with clear chat button
+    title_col, clear_col = st.columns([6, 1])
+    with title_col:
+        st.markdown("<h1 class='gradient-text'>Conversational Migration Assistant</h1>", unsafe_allow_html=True)
+    with clear_col:
+        st.write("")  # vertical spacer
+        if st.button("🗑️ Clear Chat", key="clear_chat_btn", use_container_width=True):
+            # Clear from BigQuery
+            try:
+                session_id = _get_session_id()
+                bq_project = os.getenv("GCP_PROJECT_ID")
+                bq_dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+                client = bigquery.Client(project=bq_project)
+                client.query(f"DELETE FROM `{bq_project}.{bq_dataset}.chat_history` WHERE session_id = '{session_id}'").result()
+            except Exception:
+                pass
+            # Clear session state
+            st.session_state.messages = [
+                {"role": "assistant", "content": "Hello! I am D.A.M.I. I have access to your VMware discovery inventory, dependency graph, risk scores, and wave plan in BigQuery. How can I assist you with your Google Cloud migration planning today?"}
+            ]
+            # Generate new session
+            new_sid = f"session-{uuid.uuid4().hex[:12]}"
+            st.session_state.chat_session_id = new_sid
+            st.query_params["sid"] = new_sid
+            st.rerun()
+    
     st.write("Interact with D.A.M.I using natural language queries to fetch migration statistics, check dependencies, and get architectural recommendations.")
     st.write("---")
     

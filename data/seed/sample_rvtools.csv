@@ -1,0 +1,101 @@
+VM,CPUs,Memory,Provisioned MiB,OS according to the configuration file,IP Address,Cluster,Powerstate,CPU_Avg,RAM_Avg
+WEBAPP-STAGE-01,2,4,56729,Red Hat Enterprise Linux 8 (64-bit),10.150.23.10,Cluster-Staging-US,poweredOn,17.42,48.67
+APP-PAYMENT-PROD-02,8,16,109346,Ubuntu Linux 22.04 (64-bit),10.150.23.11,Cluster-Production-US,poweredOn,51.02,79.11
+WEBAPP-PROD-03,4,8,86474,Red Hat Enterprise Linux 8 (64-bit),10.150.23.12,Cluster-Production-US,poweredOn,44.22,62.45
+APP-INVENTORY-PROD-04,4,8,80611,Ubuntu Linux 20.04 (64-bit),10.150.23.13,Cluster-Production-US,poweredOn,25.05,48.4
+APP-INVENTORY-PROD-05,4,8,88531,Ubuntu Linux 20.04 (64-bit),10.150.23.14,Cluster-Production-US,poweredOn,26.5,56.17
+DB-ORACLE-PROD-06,16,64,514239,Red Hat Enterprise Linux 7 (64-bit),10.150.23.15,Cluster-Production-US,poweredOn,65.89,87.14
+LB-NGINX-07,2,4,48272,Red Hat Enterprise Linux 8 (64-bit),10.150.23.16,Cluster-Infra-US,poweredOn,15.56,45.47
+QUEUE-RABBIT-PROD-08,4,8,60872,Ubuntu Linux 20.04 (64-bit),10.150.23.17,Cluster-Production-US,poweredOn,11.55,46.36
+QUEUE-RABBIT-PROD-09,4,8,57994,Ubuntu Linux 20.04 (64-bit),10.150.23.18,Cluster-Production-US,poweredOn,10.93,33.45
+INFRA-LDAP-10,2,4,45731,Windows Server 2016 (64-bit),10.150.23.19,Cluster-Infra-US,poweredOn,7.65,50.65
+MONITORING-NAGIOS-11,4,8,85585,Ubuntu Linux 20.04 (64-bit),10.150.23.20,Cluster-Infra-US,poweredOn,24.25,65.83
+WEBAPP-PROD-12,4,8,85844,Red Hat Enterprise Linux 8 (64-bit),10.150.23.21,Cluster-Production-US,poweredOn,42.93,71.43
+INFRA-LDAP-13,2,4,45299,Windows Server 2016 (64-bit),10.150.23.22,Cluster-Infra-US,poweredOn,6.92,51.04
+DB-ORACLE-PROD-14,16,64,519545,Red Hat Enterprise Linux 7 (64-bit),10.150.23.23,Cluster-Production-US,poweredOn,62.89,76.2
+DB-ORACLE-PROD-15,16,64,521076,Red Hat Enterprise Linux 7 (64-bit),10.150.23.24,Cluster-Production-US,poweredOn,61.01,79.17
+INFRA-LDAP-16,2,4,38504,Windows Server 2016 (64-bit),10.150.23.25,Cluster-Infra-US,poweredOn,8.7,53.14
+DB-MYSQL-STAGE-17,4,16,108778,Ubuntu Linux 20.04 (64-bit),10.150.23.26,Cluster-Staging-US,poweredOn,22.37,47.72
+APP-ORDER-PROD-18,4,8,85551,Ubuntu Linux 22.04 (64-bit),10.150.23.27,Cluster-Production-US,poweredOn,37.29,57.45
+INFRA-DNS-19,2,4,40262,Red Hat Enterprise Linux 8 (64-bit),10.150.23.28,Cluster-Infra-US,poweredOn,9.9,29.6
+DB-ORACLE-PROD-20,16,64,518096,Red Hat Enterprise Linux 7 (64-bit),10.150.23.29,Cluster-Production-US,poweredOn,63.24,86.52
+LB-HAProxy-21,2,4,39592,Ubuntu Linux 20.04 (64-bit),10.150.23.30,Cluster-Infra-US,poweredOn,11.22,37.08
+INFRA-DNS-22,2,4,40226,Red Hat Enterprise Linux 8 (64-bit),10.150.23.31,Cluster-Infra-US,poweredOn,0.66,33.7
+QUEUE-RABBIT-PROD-23,4,8,59803,Ubuntu Linux 20.04 (64-bit),10.150.23.32,Cluster-Production-US,poweredOn,16.55,37.93
+MONITORING-NAGIOS-24,4,8,79140,Ubuntu Linux 20.04 (64-bit),10.150.23.33,Cluster-Infra-US,poweredOn,25.65,55.7
+DB-MYSQL-STAGE-25,4,16,109519,Ubuntu Linux 20.04 (64-bit),10.150.23.34,Cluster-Staging-US,poweredOn,18.85,51.47
+INFRA-DNS-26,2,4,41770,Red Hat Enterprise Linux 8 (64-bit),10.150.23.35,Cluster-Infra-US,poweredOn,2.19,34.96
+DEV-TEST-VM-27,2,4,43925,CentOS 7 (64-bit),10.150.23.36,Cluster-Infra-US,poweredOn,0.91,15.71
+WEBAPP-STAGE-28,2,4,58824,Red Hat Enterprise Linux 8 (64-bit),10.150.23.37,Cluster-Staging-US,poweredOn,16.27,56.88
+INFRA-NTP-29,1,2,25131,Ubuntu Linux 18.04 (64-bit),10.150.23.38,Cluster-Infra-US,poweredOn,-2.36,10.72
+MONITORING-NAGIOS-30,4,8,85469,Ubuntu Linux 20.04 (64-bit),10.150.23.39,Cluster-Infra-US,poweredOn,25.51,60.3
+LB-NGINX-31,2,4,46985,Red Hat Enterprise Linux 8 (64-bit),10.150.23.40,Cluster-Infra-US,poweredOn,14.71,45.23
+DB-MYSQL-STAGE-32,4,16,109872,Ubuntu Linux 20.04 (64-bit),10.150.23.41,Cluster-Staging-US,poweredOn,19.41,39.67
+INFRA-NTP-33,1,2,17951,Ubuntu Linux 18.04 (64-bit),10.150.23.42,Cluster-Infra-US,poweredOn,1.54,19.31
+DB-MYSQL-STAGE-34,4,16,105481,Ubuntu Linux 20.04 (64-bit),10.150.23.43,Cluster-Staging-US,poweredOn,20.62,45.62
+WEBAPP-STAGE-35,2,4,70582,Red Hat Enterprise Linux 8 (64-bit),10.150.23.44,Cluster-Staging-US,poweredOn,16.25,57.63
+DEV-TEST-VM-36,2,4,45817,CentOS 7 (64-bit),10.150.23.45,Cluster-Infra-US,poweredOn,1.99,20.61
+APP-ORDER-PROD-37,4,8,85637,Ubuntu Linux 22.04 (64-bit),10.150.23.46,Cluster-Production-US,poweredOn,39.53,68.84
+LB-NGINX-38,2,4,45653,Red Hat Enterprise Linux 8 (64-bit),10.150.23.47,Cluster-Infra-US,poweredOn,10.74,35.29
+INFRA-LDAP-39,2,4,50236,Windows Server 2016 (64-bit),10.150.23.48,Cluster-Infra-US,poweredOn,14.85,62.1
+DB-ORACLE-PROD-40,16,64,507829,Red Hat Enterprise Linux 7 (64-bit),10.150.23.49,Cluster-Production-US,poweredOn,62.41,83.51
+WEBAPP-PROD-41,4,8,78203,Red Hat Enterprise Linux 8 (64-bit),10.150.23.50,Cluster-Production-US,poweredOn,47.32,74.24
+APP-PAYMENT-PROD-42,8,16,99383,Ubuntu Linux 22.04 (64-bit),10.150.23.51,Cluster-Production-US,poweredOn,56.6,82.2
+APP-ORDER-PROD-43,4,8,81142,Ubuntu Linux 22.04 (64-bit),10.150.23.52,Cluster-Production-US,poweredOn,35.28,64.1
+APP-INVENTORY-PROD-44,4,8,92019,Ubuntu Linux 20.04 (64-bit),10.150.23.53,Cluster-Production-US,poweredOn,25.39,58.95
+APP-INVENTORY-PROD-45,4,8,88480,Ubuntu Linux 20.04 (64-bit),10.150.23.54,Cluster-Production-US,poweredOn,23.12,62.93
+INFRA-LDAP-46,2,4,43017,Windows Server 2016 (64-bit),10.150.23.55,Cluster-Infra-US,poweredOn,14.0,56.77
+DB-ORACLE-PROD-47,16,64,510561,Red Hat Enterprise Linux 7 (64-bit),10.150.23.56,Cluster-Production-US,poweredOn,60.64,75.32
+DB-ORACLE-PROD-48,16,64,516521,Red Hat Enterprise Linux 7 (64-bit),10.150.23.57,Cluster-Production-US,poweredOn,62.2,76.06
+LB-HAProxy-49,2,4,39590,Ubuntu Linux 20.04 (64-bit),10.150.23.58,Cluster-Infra-US,poweredOn,3.67,25.47
+QUEUE-RABBIT-PROD-50,4,8,57480,Ubuntu Linux 20.04 (64-bit),10.150.23.59,Cluster-Production-US,poweredOn,15.14,36.18
+LEGACY-ARCHIVE-51,2,4,203190,Windows Server 2008 R2 (64-bit),10.150.23.60,Cluster-Infra-US,poweredOff,0.0,0.0
+APP-PAYMENT-PROD-52,8,16,109131,Ubuntu Linux 22.04 (64-bit),10.150.23.61,Cluster-Production-US,poweredOn,59.36,76.57
+LEGACY-ARCHIVE-53,2,4,203661,Windows Server 2008 R2 (64-bit),10.150.23.62,Cluster-Infra-US,poweredOff,0.0,0.0
+LEGACY-ARCHIVE-54,2,4,212910,Windows Server 2008 R2 (64-bit),10.150.23.63,Cluster-Infra-US,poweredOff,0.0,0.0
+INFRA-NTP-55,1,2,18479,Ubuntu Linux 18.04 (64-bit),10.150.23.64,Cluster-Infra-US,poweredOn,-2.06,14.88
+INFRA-LDAP-56,2,4,42779,Windows Server 2016 (64-bit),10.150.23.65,Cluster-Infra-US,poweredOn,9.11,62.96
+LB-HAProxy-57,2,4,46872,Ubuntu Linux 20.04 (64-bit),10.150.23.66,Cluster-Infra-US,poweredOn,9.53,34.69
+LB-HAProxy-58,2,4,42436,Ubuntu Linux 20.04 (64-bit),10.150.23.67,Cluster-Infra-US,poweredOn,10.28,37.01
+WEBAPP-STAGE-59,2,4,60393,Red Hat Enterprise Linux 8 (64-bit),10.150.23.68,Cluster-Staging-US,poweredOn,11.92,53.04
+APP-PAYMENT-PROD-60,8,16,104192,Ubuntu Linux 22.04 (64-bit),10.150.23.69,Cluster-Production-US,poweredOn,51.83,74.94
+WEBAPP-PROD-61,4,8,84060,Red Hat Enterprise Linux 8 (64-bit),10.150.23.70,Cluster-Production-US,poweredOn,48.08,74.84
+WEBAPP-STAGE-62,2,4,57148,Red Hat Enterprise Linux 8 (64-bit),10.150.23.71,Cluster-Staging-US,poweredOn,16.52,53.11
+LB-NGINX-63,2,4,37368,Red Hat Enterprise Linux 8 (64-bit),10.150.23.72,Cluster-Infra-US,poweredOn,16.76,47.73
+APP-ORDER-PROD-64,4,8,83458,Ubuntu Linux 22.04 (64-bit),10.150.23.73,Cluster-Production-US,poweredOn,34.86,58.21
+INFRA-DNS-65,2,4,50625,Red Hat Enterprise Linux 8 (64-bit),10.150.23.74,Cluster-Infra-US,poweredOn,0.59,25.68
+INFRA-DNS-66,2,4,40185,Red Hat Enterprise Linux 8 (64-bit),10.150.23.75,Cluster-Infra-US,poweredOn,9.27,31.78
+CACHE-REDIS-PROD-67,4,16,42770,Ubuntu Linux 20.04 (64-bit),10.150.23.76,Cluster-Production-US,poweredOn,23.97,80.96
+LEGACY-ARCHIVE-68,2,4,202216,Windows Server 2008 R2 (64-bit),10.150.23.77,Cluster-Infra-US,poweredOff,0.0,0.0
+APP-INVENTORY-PROD-69,4,8,81661,Ubuntu Linux 20.04 (64-bit),10.150.23.78,Cluster-Production-US,poweredOn,22.18,48.88
+LB-HAProxy-70,2,4,48094,Ubuntu Linux 20.04 (64-bit),10.150.23.79,Cluster-Infra-US,poweredOn,6.14,25.75
+LEGACY-ARCHIVE-71,2,4,207918,Windows Server 2008 R2 (64-bit),10.150.23.80,Cluster-Infra-US,poweredOff,0.0,0.0
+DEV-TEST-VM-72,2,4,38419,CentOS 7 (64-bit),10.150.23.81,Cluster-Infra-US,poweredOn,0.57,22.62
+APP-ORDER-PROD-73,4,8,77922,Ubuntu Linux 22.04 (64-bit),10.150.23.82,Cluster-Production-US,poweredOn,35.95,65.13
+DB-ORACLE-PROD-74,16,64,513495,Red Hat Enterprise Linux 7 (64-bit),10.150.23.83,Cluster-Production-US,poweredOn,61.2,88.35
+DB-ORACLE-PROD-75,16,64,516365,Red Hat Enterprise Linux 7 (64-bit),10.150.23.84,Cluster-Production-US,poweredOn,65.95,84.29
+INFRA-NTP-76,1,2,26130,Ubuntu Linux 18.04 (64-bit),10.150.23.85,Cluster-Infra-US,poweredOn,2.84,12.84
+DB-MYSQL-STAGE-77,4,16,100626,Ubuntu Linux 20.04 (64-bit),10.150.23.86,Cluster-Staging-US,poweredOn,19.7,42.71
+DB-MYSQL-STAGE-78,4,16,103764,Ubuntu Linux 20.04 (64-bit),10.150.23.87,Cluster-Staging-US,poweredOn,14.31,47.68
+MONITORING-NAGIOS-79,4,8,81980,Ubuntu Linux 20.04 (64-bit),10.150.23.88,Cluster-Infra-US,poweredOn,32.29,66.04
+LB-NGINX-80,2,4,43348,Red Hat Enterprise Linux 8 (64-bit),10.150.23.89,Cluster-Infra-US,poweredOn,13.71,43.44
+WEBAPP-STAGE-81,2,4,57520,Red Hat Enterprise Linux 8 (64-bit),10.150.23.90,Cluster-Staging-US,poweredOn,15.38,52.59
+APP-PAYMENT-PROD-82,8,16,112570,Ubuntu Linux 22.04 (64-bit),10.150.23.91,Cluster-Production-US,poweredOn,53.49,69.03
+DB-ORACLE-PROD-83,16,64,512934,Red Hat Enterprise Linux 7 (64-bit),10.150.23.92,Cluster-Production-US,poweredOn,62.85,81.57
+CACHE-REDIS-PROD-84,4,16,45861,Ubuntu Linux 20.04 (64-bit),10.150.23.93,Cluster-Production-US,poweredOn,26.84,82.11
+DEV-TEST-VM-85,2,4,35968,CentOS 7 (64-bit),10.150.23.94,Cluster-Infra-US,poweredOn,6.68,23.32
+WEBAPP-STAGE-86,2,4,70707,Red Hat Enterprise Linux 8 (64-bit),10.150.23.95,Cluster-Staging-US,poweredOn,11.34,46.73
+WEBAPP-STAGE-87,2,4,68483,Red Hat Enterprise Linux 8 (64-bit),10.150.23.96,Cluster-Staging-US,poweredOn,15.53,49.09
+APP-INVENTORY-PROD-88,4,8,88557,Ubuntu Linux 20.04 (64-bit),10.150.23.97,Cluster-Production-US,poweredOn,23.43,58.31
+DB-MYSQL-STAGE-89,4,16,105560,Ubuntu Linux 20.04 (64-bit),10.150.23.98,Cluster-Staging-US,poweredOn,17.89,51.58
+LB-HAProxy-90,2,4,37352,Ubuntu Linux 20.04 (64-bit),10.150.23.99,Cluster-Infra-US,poweredOn,9.34,37.44
+LB-HAProxy-91,2,4,35898,Ubuntu Linux 20.04 (64-bit),10.150.23.100,Cluster-Infra-US,poweredOn,6.34,26.96
+DB-MYSQL-STAGE-92,4,16,99927,Ubuntu Linux 20.04 (64-bit),10.150.23.101,Cluster-Staging-US,poweredOn,20.41,46.28
+INFRA-NTP-93,1,2,24549,Ubuntu Linux 18.04 (64-bit),10.150.23.102,Cluster-Infra-US,poweredOn,-2.9,6.13
+APP-PAYMENT-PROD-94,8,16,106218,Ubuntu Linux 22.04 (64-bit),10.150.23.103,Cluster-Production-US,poweredOn,50.36,73.54
+APP-PAYMENT-PROD-95,8,16,104321,Ubuntu Linux 22.04 (64-bit),10.150.23.104,Cluster-Production-US,poweredOn,51.27,72.62
+LB-HAProxy-96,2,4,50567,Ubuntu Linux 20.04 (64-bit),10.150.23.105,Cluster-Infra-US,poweredOn,6.58,35.23
+WEBAPP-STAGE-97,2,4,62114,Red Hat Enterprise Linux 8 (64-bit),10.150.23.106,Cluster-Staging-US,poweredOn,17.8,58.26
+INFRA-NTP-98,1,2,25528,Ubuntu Linux 18.04 (64-bit),10.150.23.107,Cluster-Infra-US,poweredOn,4.49,18.89
+DB-ORACLE-PROD-99,16,64,521045,Red Hat Enterprise Linux 7 (64-bit),10.150.23.108,Cluster-Production-US,poweredOn,61.63,87.0
+APP-ORDER-PROD-100,4,8,91241,Ubuntu Linux 22.04 (64-bit),10.150.23.109,Cluster-Production-US,poweredOn,34.12,57.69

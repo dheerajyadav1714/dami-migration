@@ -190,10 +190,19 @@ def render():
             {"role": "assistant", "content": "Hello! I am D.A.M.I. I have access to your VMware discovery inventory, dependency graph, risk scores, and wave plan in BigQuery. How can I assist you with your Google Cloud migration planning today?"}
         ]
         
-    # Render chat history
-    for message in st.session_state.messages:
+    # Render chat history (with SQL results if stored)
+    for idx, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            # Show stored SQL results for this message
+            result_key = f"_sql_result_{idx}"
+            query_key = f"_sql_query_{idx}"
+            if result_key in st.session_state:
+                st.caption("📊 **Live BigQuery Result:**")
+                st.dataframe(st.session_state[result_key], use_container_width=True, hide_index=True)
+                if query_key in st.session_state:
+                    with st.expander("🔍 View SQL Query"):
+                        st.code(st.session_state[query_key], language="sql")
             
     # Dynamic context-aware suggestions
     def get_dynamic_suggestions():
@@ -245,6 +254,12 @@ def render():
                 st.session_state.messages.append({"role": "user", "content": query_text})
                 response = get_orchestrator_response(query_text)
                 st.session_state.messages.append({"role": "assistant", "content": response})
+                # Persist SQL results keyed to this message index
+                msg_idx = len(st.session_state.messages) - 1
+                if "_last_sql_result" in st.session_state:
+                    st.session_state[f"_sql_result_{msg_idx}"] = st.session_state.pop("_last_sql_result")
+                if "_last_sql_query" in st.session_state:
+                    st.session_state[f"_sql_query_{msg_idx}"] = st.session_state.pop("_last_sql_query")
                 st.rerun()
             
     # Chat Input
@@ -257,7 +272,7 @@ def render():
         # Assistant response
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
-            message_placeholder.markdown("Analyzing BigQuery data...")
+            message_placeholder.markdown("⏳ Querying BigQuery and analyzing with Gemini...")
             
             response = get_orchestrator_response(prompt)
             message_placeholder.markdown(response)
@@ -266,12 +281,19 @@ def render():
             if "_last_sql_result" in st.session_state:
                 st.caption("📊 **Live BigQuery Result:**")
                 st.dataframe(st.session_state["_last_sql_result"], use_container_width=True, hide_index=True)
-                del st.session_state["_last_sql_result"]
                 if "_last_sql_query" in st.session_state:
-                    del st.session_state["_last_sql_query"]
+                    with st.expander("🔍 View SQL Query"):
+                        st.code(st.session_state["_last_sql_query"], language="sql")
             
         st.session_state.messages.append({"role": "assistant", "content": response})
+        # Persist SQL results keyed to this message index
+        msg_idx = len(st.session_state.messages) - 1
+        if "_last_sql_result" in st.session_state:
+            st.session_state[f"_sql_result_{msg_idx}"] = st.session_state.pop("_last_sql_result")
+        if "_last_sql_query" in st.session_state:
+            st.session_state[f"_sql_query_{msg_idx}"] = st.session_state.pop("_last_sql_query")
         st.rerun()
 
 if __name__ == "__main__":
     render()
+

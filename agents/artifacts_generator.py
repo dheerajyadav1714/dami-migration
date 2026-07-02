@@ -154,7 +154,7 @@ class ArtifactsGeneratorAgent:
                 "wave_id": wave_id,
                 "artifact_type": "terraform",
                 "file_name": f"wave_{wave_number}_infra.tf",
-                "gcs_path": f"gs://dami-migration-artifacts/wave_{wave_number}/wave_{wave_number}_infra.tf",
+                "gcs_path": f"gs://{os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')}/iac-artifacts/wave_{wave_number}/wave_{wave_number}_infra.tf",
                 "content_preview": tf_hcl[:450],
                 "resource_count": len(workloads_list),
                 "validated": True,
@@ -169,7 +169,7 @@ class ArtifactsGeneratorAgent:
                 "wave_id": wave_id,
                 "artifact_type": "kubernetes",
                 "file_name": f"wave_{wave_number}_k8s.yaml",
-                "gcs_path": f"gs://dami-migration-artifacts/wave_{wave_number}/wave_{wave_number}_k8s.yaml",
+                "gcs_path": f"gs://{os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')}/iac-artifacts/wave_{wave_number}/wave_{wave_number}_k8s.yaml",
                 "content_preview": k8s_yaml[:450],
                 "resource_count": 2,
                 "validated": True,
@@ -184,7 +184,7 @@ class ArtifactsGeneratorAgent:
                 "wave_id": wave_id,
                 "artifact_type": "ansible",
                 "file_name": f"wave_{wave_number}_ansible.yaml",
-                "gcs_path": f"gs://dami-migration-artifacts/wave_{wave_number}/wave_{wave_number}_ansible.yaml",
+                "gcs_path": f"gs://{os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')}/iac-artifacts/wave_{wave_number}/wave_{wave_number}_ansible.yaml",
                 "content_preview": ansible_yaml[:450],
                 "resource_count": len(workloads_list),
                 "validated": True,
@@ -232,7 +232,7 @@ class ArtifactsGeneratorAgent:
                 "server_id": None,
                 "wave_id": wave_id,
                 "title": f"Migration Runbook: Wave {wave_number} ({wave_name})",
-                "gcs_path": f"gs://dami-migration-artifacts/wave_{wave_number}/runbook.md",
+                "gcs_path": f"gs://{os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')}/iac-artifacts/wave_{wave_number}/runbook.md",
                 "sections": json.dumps([
                     {"name": "Phase 1: Pre-Migration Validation", "status": "pending"},
                     {"name": "Phase 2: Execution (Cutover)", "status": "pending"},
@@ -286,6 +286,31 @@ class ArtifactsGeneratorAgent:
         if runbook_md:
             with open(f"{asset_dir}/wave_{wave_number}_runbook.md", "w", encoding="utf-8") as f:
                 f.write(runbook_md)
+        
+        # 8. Upload artifacts to Google Cloud Storage
+        gcs_bucket_name = os.getenv("GCS_BUCKET", "dami-artifacts-cohort-2")
+        try:
+            from google.cloud import storage as gcs
+            gcs_client = gcs.Client(project=self.project_id)
+            bucket = gcs_client.bucket(gcs_bucket_name)
+            
+            artifact_files = {
+                f"wave_{wave_number}/wave_{wave_number}_infra.tf": tf_hcl,
+                f"wave_{wave_number}/wave_{wave_number}_k8s.yaml": k8s_yaml,
+                f"wave_{wave_number}/wave_{wave_number}_ansible.yaml": ansible_yaml,
+                f"wave_{wave_number}/wave_{wave_number}_runbook.md": runbook_md,
+            }
+            
+            uploaded_count = 0
+            for gcs_path, content in artifact_files.items():
+                if content:
+                    blob = bucket.blob(f"iac-artifacts/{gcs_path}")
+                    blob.upload_from_string(content)
+                    uploaded_count += 1
+            
+            print(f"Uploaded {uploaded_count} artifacts to gs://{gcs_bucket_name}/iac-artifacts/wave_{wave_number}/")
+        except Exception as gcs_err:
+            print(f"GCS upload skipped (non-critical): {gcs_err}")
                 
         print(f"Successfully generated all execution artifacts for Wave {wave_number}.")
         return {

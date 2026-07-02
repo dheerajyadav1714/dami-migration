@@ -8,6 +8,8 @@ import pandas as pd
 from google.cloud import bigquery
 import requests
 import json
+import uuid
+import datetime
 
 @st.cache_resource
 def get_bq_client(project_id):
@@ -79,6 +81,109 @@ def get_bq_context():
         
     return context
 
+def _get_session_id():
+    """Generate or retrieve a unique session ID for chat persistence.
+    Uses st.query_params to survive page refreshes on Cloud Run."""
+    if "chat_session_id" not in st.session_state:
+        # Check URL query params first (survives refresh)
+        params = st.query_params
+        if "sid" in params:
+            st.session_state.chat_session_id = params["sid"]
+        else:
+            new_sid = f"session-{uuid.uuid4().hex[:12]}"
+            st.session_state.chat_session_id = new_sid
+            st.query_params["sid"] = new_sid
+    return st.session_state.chat_session_id
+
+def _save_chat_to_bq(messages: list):
+    """Save the current chat history to BigQuery for persistence."""
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    session_id = _get_session_id()
+    
+    try:
+        client = bigquery.Client(project=project_id)
+        table_id = f"{project_id}.{dataset}.chat_history"
+        
+        # Ensure table exists
+        try:
+            client.get_table(table_id)
+        except Exception:
+            schema = [
+                bigquery.SchemaField("session_id", "STRING"),
+                bigquery.SchemaField("message_index", "INT64"),
+                bigquery.SchemaField("role", "STRING"),
+                bigquery.SchemaField("content", "STRING"),
+                bigquery.SchemaField("timestamp", "TIMESTAMP"),
+            ]
+            table = bigquery.Table(table_id, schema=schema)
+            client.create_table(table)
+        
+        # Build rows
+        rows = []
+        now = datetime.datetime.utcnow().isoformat()
+        for i, msg in enumerate(messages):
+            rows.append({
+                "session_id": session_id,
+                "message_index": i,
+                "role": msg["role"],
+                "content": msg["content"][:5000],  # Truncate long messages
+                "timestamp": now,
+            })
+        
+        # Overwrite session data using load job
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+        )
+        # Use a temp table per session, then merge — or simply append
+        # For simplicity, we delete old session rows first
+        client.query(f"DELETE FROM `{table_id}` WHERE session_id = '{session_id}'").result()
+        if rows:
+            client.insert_rows_json(table_id, rows)
+    except Exception as e:
+        print(f"Chat save to BQ failed (non-critical): {e}")
+
+def _load_chat_from_bq() -> list:
+    """Load chat session from BigQuery. Falls back to most recent session if current not found."""
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    session_id = _get_session_id()
+    
+    try:
+        client = bigquery.Client(project=project_id)
+        
+        # Try current session first
+        df = client.query(f"""
+            SELECT role, content 
+            FROM `{project_id}.{dataset}.chat_history`
+            WHERE session_id = '{session_id}'
+            ORDER BY message_index
+        """).to_dataframe()
+        
+        if not df.empty:
+            return [{"role": row["role"], "content": row["content"]} for _, row in df.iterrows()]
+        
+        # Fallback: load the most recent session
+        df = client.query(f"""
+            SELECT session_id, role, content 
+            FROM `{project_id}.{dataset}.chat_history`
+            WHERE session_id = (
+                SELECT session_id FROM `{project_id}.{dataset}.chat_history`
+                ORDER BY timestamp DESC LIMIT 1
+            )
+            ORDER BY message_index
+        """).to_dataframe()
+        
+        if not df.empty:
+            # Update our session_id to match the loaded one
+            loaded_sid = df.iloc[0]["session_id"]
+            st.session_state.chat_session_id = loaded_sid
+            st.query_params["sid"] = loaded_sid
+            return [{"role": row["role"], "content": row["content"]} for _, row in df.iterrows()]
+    except Exception:
+        pass
+    return []
+
 def get_orchestrator_response(query):
     """Route all queries through Gemini grounded on live BigQuery data."""
     project_id = os.getenv("GCP_PROJECT_ID")
@@ -92,8 +197,18 @@ def get_orchestrator_response(query):
         location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
         model_name = "gemini-2.5-flash"
         
-        client = Client(enterprise=True)
-        model_path = f"projects/{vertex_project}/locations/{location}/publishers/google/models/{model_name}"
+        # Try API key first, then enterprise (Vertex AI)
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            client = Client(api_key=api_key)
+            model_path = model_name
+        else:
+            client = Client(
+                vertexai=True,
+                project=vertex_project,
+                location=location
+            )
+            model_path = model_name
         
         context = get_bq_context()
         
@@ -179,18 +294,22 @@ def get_orchestrator_response(query):
         return response_text
         
     except Exception as e:
+        error_msg = str(e)[:200]
         print(f"Gemini query failed: {e}")
         # Graceful fallback with BQ context summary
         try:
             context = get_bq_context()
+            savings = context.get('cost_estimates', {}).get('estimated_annual_savings', 0)
+            savings_str = f"${float(savings):,.0f}" if savings else "N/A"
             return (
                 f"I have access to your migration database with **{context['discovered_servers']} discovered servers**, "
                 f"mapped across **{len(context.get('waves_breakdown', []))} waves**. "
-                f"The estimated annual cloud cost savings is **${context.get('cost_estimates', {}).get('estimated_annual_savings', 'N/A'):,.0f}**.\n\n"
-                f"I was unable to generate a detailed AI response at this time. Please try again or ask a more specific question about your migration data."
+                f"The estimated annual cloud cost savings is **{savings_str}**.\n\n"
+                f"⚠️ AI response generation encountered an error: `{error_msg}`\n\n"
+                f"Please try again or ask a more specific question about your migration data."
             )
-        except:
-            return "I'm currently experiencing connectivity issues with the AI backend. Please try again in a moment."
+        except Exception as fallback_err:
+            return f"I'm currently experiencing connectivity issues with the AI backend. Error: `{error_msg}`. Please try again in a moment."
 
 # Large pool of suggestions organized by category
 ALL_SUGGESTIONS = [
@@ -232,11 +351,15 @@ def render():
     st.write("Interact with D.A.M.I using natural language queries to fetch migration statistics, check dependencies, and get architectural recommendations.")
     st.write("---")
     
-    # Initialize Chat History
+    # Initialize Chat History — load from BigQuery if available
     if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hello! I am D.A.M.I. I have access to your VMware discovery inventory, dependency graph, risk scores, and wave plan in BigQuery. How can I assist you with your Google Cloud migration planning today?"}
-        ]
+        persisted = _load_chat_from_bq()
+        if persisted:
+            st.session_state.messages = persisted
+        else:
+            st.session_state.messages = [
+                {"role": "assistant", "content": "Hello! I am D.A.M.I. I have access to your VMware discovery inventory, dependency graph, risk scores, and wave plan in BigQuery. How can I assist you with your Google Cloud migration planning today?"}
+            ]
         
     # Render chat history
     for message in st.session_state.messages:
@@ -269,6 +392,7 @@ def render():
                 with st.spinner("⏳ Querying BigQuery and analyzing with Gemini..."):
                     response = get_orchestrator_response(query_text)
                 st.session_state.messages.append({"role": "assistant", "content": response})
+                _save_chat_to_bq(st.session_state.messages)
                 st.rerun()
             
     # Chat Input — don't render inline, just add to history and rerun
@@ -285,6 +409,7 @@ def render():
         with st.spinner("⏳ Querying BigQuery and analyzing with Gemini..."):
             response = get_orchestrator_response(user_query)
         st.session_state.messages.append({"role": "assistant", "content": response})
+        _save_chat_to_bq(st.session_state.messages)
         st.rerun()
 
 if __name__ == "__main__":

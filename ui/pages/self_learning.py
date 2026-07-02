@@ -45,7 +45,7 @@ def render():
     
     with status_col2:
         # Check AlloyDB status
-        alloydb_status = "● Offline — Start Docker container"
+        alloydb_status = "● Offline"
         alloydb_color = "#ef4444"
         try:
             import psycopg2
@@ -70,7 +70,7 @@ def render():
             border-radius: 10px;
             padding: 16px;
         ">
-            <div style="font-weight: 700; color: #76b900; font-size: 1rem;">🐘 AlloyDB Omni (Docker)</div>
+            <div style="font-weight: 700; color: #76b900; font-size: 1rem;">🐘 AlloyDB</div>
             <div style="font-size: 0.8rem; color: {alloydb_color}; margin-top: 6px;">{alloydb_status}</div>
             <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">
                 Optional vector similarity backend for semantic memory search via <code>pgvector</code>.

@@ -148,12 +148,34 @@ class RiskScorerAgent:
         
         # Execute BQML prediction if model exists, otherwise calculate using scoring formula
         model_exists = False
+        bqml_predictions = {}  # server_id → predicted label (1=complex, 0=simple)
         try:
             # Quick check if BQML model exists
             model_query = f"SELECT model_name FROM `{self.project_id}.{self.dataset}.__TABLES__` WHERE table_id = 'migration_risk_model'"
             model_exists = len(client.query(model_query).to_dataframe()) > 0
-        except Exception:
-            pass
+            
+            if model_exists:
+                # Run ML.PREDICT to get BQML predictions for all servers
+                predict_query = f"""
+                    SELECT
+                        s.server_id,
+                        predicted_label,
+                        predicted_label_probs
+                    FROM ML.PREDICT(
+                        MODEL `{self.project_id}.{self.dataset}.migration_risk_model`,
+                        (
+                            SELECT server_id, vcpu, ram_gb, cpu_utilization_avg, ram_utilization_avg
+                            FROM `{self.project_id}.{self.dataset}.servers`
+                        )
+                    ) s
+                """
+                pred_df = client.query(predict_query).to_dataframe()
+                for _, pred_row in pred_df.iterrows():
+                    bqml_predictions[pred_row["server_id"]] = int(pred_row["predicted_label"])
+                print(f"BQML ML.PREDICT returned predictions for {len(bqml_predictions)} servers.")
+        except Exception as e:
+            print(f"BQML model check/predict failed (using heuristic fallback): {e}")
+            model_exists = False
             
         for idx, row in servers_df.iterrows():
             srv_id = row["server_id"]
@@ -198,13 +220,18 @@ class RiskScorerAgent:
             if len(row["compliance_flags"]) > 0:
                 comp_risk = len(row["compliance_flags"]) * 2.5
                 
-            # Overall score: weighted average or BQML predicted value
-            if model_exists:
-                # In real-world, we run BQML prediction query
-                overall_score = 5.0 # fallback default
+            # Overall score: weighted average boosted by BQML prediction
+            heuristic_score = (complexity * 0.3) + (criticality * 0.3) + (tech_risk * 0.2) + (comp_risk * 0.2)
+            heuristic_score = min(10.0, round(heuristic_score, 2))
+            
+            if model_exists and srv_id in bqml_predictions:
+                # BQML predicted label: 1 = complex strategy needed, 0 = simple
+                bqml_label = bqml_predictions[srv_id]
+                # Blend: if BQML predicts complex, boost score by 1.5; if simple, reduce by 1.0
+                bqml_adjustment = 1.5 if bqml_label == 1 else -1.0
+                overall_score = min(10.0, max(0.0, round(heuristic_score + bqml_adjustment, 2)))
             else:
-                overall_score = (complexity * 0.3) + (criticality * 0.3) + (tech_risk * 0.2) + (comp_risk * 0.2)
-                overall_score = min(10.0, round(overall_score, 2))
+                overall_score = heuristic_score
                 
             # Risk Level classification
             if overall_score >= 8.5:
@@ -285,10 +312,48 @@ class RiskScorerAgent:
         
         try:
             query_job = client.query(query)
-            query_job.result() # Wait for training to complete
-            return "BQML Model trained successfully."
+            query_job.result()  # Wait for training to complete
+            return "BQML Model 'migration_risk_model' trained successfully. ML.PREDICT will be used in future risk assessments."
         except Exception as e:
             return f"Failed to train BQML model: {e}"
+    
+    def evaluate_bqml_model(self) -> dict:
+        """
+        Evaluates the trained BQML model using ML.EVALUATE to check accuracy,
+        precision, recall, and F1 score.
+        """
+        print("Evaluating BQML migration risk model...")
+        client = bigquery.Client(project=self.project_id)
+        
+        query = f"""
+        SELECT *
+        FROM ML.EVALUATE(
+            MODEL `{self.project_id}.{self.dataset}.migration_risk_model`,
+            (
+                SELECT
+                    vcpu,
+                    ram_gb,
+                    cpu_utilization_avg,
+                    ram_utilization_avg,
+                    CASE WHEN recommended_strategy IN ('refactor', 'replatform', 'relocate') THEN 1 ELSE 0 END as label
+                FROM
+                    `{self.project_id}.{self.dataset}.servers` s
+                JOIN
+                    `{self.project_id}.{self.dataset}.risk_scores` r
+                ON s.server_id = r.server_id
+            )
+        )
+        """
+        
+        try:
+            eval_df = client.query(query).to_dataframe()
+            if not eval_df.empty:
+                result = eval_df.iloc[0].to_dict()
+                # Convert numpy types to native Python for JSON serialization
+                return {k: float(v) if hasattr(v, 'item') else v for k, v in result.items()}
+            return {"error": "Empty evaluation result"}
+        except Exception as e:
+            return {"error": str(e)}
 
 if __name__ == "__main__":
     scorer = RiskScorerAgent()

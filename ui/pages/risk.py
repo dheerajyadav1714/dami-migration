@@ -166,6 +166,97 @@ def render():
             "strategy_rationale": st.column_config.TextColumn("Rationale", width="large"),
         }
     )
+    
+    st.write("---")
+    
+    # --- BQML Model Training & Evaluation ---
+    st.subheader("🧠 BigQuery ML — Risk Prediction Model")
+    st.write("Train a BQML Logistic Regression model to predict complex migration strategies based on server resource metrics. Once trained, `ML.PREDICT` is automatically used in future risk assessments.")
+    
+    bqml_col1, bqml_col2 = st.columns([1, 1])
+    
+    with bqml_col1:
+        st.markdown("""
+        <div style="
+            background: rgba(66, 133, 244, 0.08);
+            border: 1px solid rgba(66, 133, 244, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+        ">
+            <div style="font-weight: 700; color: #4285f4; font-size: 1rem;">📐 Model Architecture</div>
+            <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 8px;">
+                <b>Type:</b> Logistic Regression (LOGISTIC_REG)<br/>
+                <b>Features:</b> vcpu, ram_gb, cpu_utilization_avg, ram_utilization_avg<br/>
+                <b>Label:</b> Complex strategy needed (Refactor/Replatform/Relocate = 1, else 0)<br/>
+                <b>Training Data:</b> servers ⨝ risk_scores tables<br/>
+                <b>Integration:</b> ML.PREDICT blends with heuristic scoring
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with bqml_col2:
+        # Check if model already exists
+        model_status = "Not Trained"
+        model_color = "#f59e0b"
+        try:
+            client = bigquery.Client(project=project_id)
+            model_query = f"SELECT model_name FROM `{project_id}.{dataset}.__TABLES__` WHERE table_id = 'migration_risk_model'"
+            model_check = client.query(model_query).to_dataframe()
+            if len(model_check) > 0:
+                model_status = "Trained ✅"
+                model_color = "#10b981"
+        except Exception:
+            pass
+        
+        st.markdown(f"""
+        <div style="
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+        ">
+            <div style="font-weight: 700; color: {model_color}; font-size: 1rem;">🔄 Model Status: {model_status}</div>
+            <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 8px;">
+                When trained, <code>ML.PREDICT</code> runs automatically during risk assessment.<br/>
+                Predictions adjust heuristic scores: complex workloads get a risk boost, simple workloads get reduced scores.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.write("")
+    
+    train_col1, train_col2 = st.columns(2)
+    with train_col1:
+        if st.button("🚀 Train BQML Risk Model", use_container_width=True):
+            with st.spinner("Training BQML Logistic Regression model on BigQuery... This may take 30-60 seconds."):
+                from agents.risk_scorer import RiskScorerAgent
+                scorer = RiskScorerAgent()
+                result = scorer.train_bqml_model()
+            if "successfully" in result.lower():
+                st.success(result)
+                st.rerun()
+            else:
+                st.error(result)
+    
+    with train_col2:
+        if st.button("📊 Evaluate Model Performance", use_container_width=True):
+            with st.spinner("Running ML.EVALUATE on trained model..."):
+                from agents.risk_scorer import RiskScorerAgent
+                scorer = RiskScorerAgent()
+                eval_result = scorer.evaluate_bqml_model()
+            
+            if "error" not in eval_result:
+                eval_col1, eval_col2, eval_col3, eval_col4 = st.columns(4)
+                with eval_col1:
+                    st.metric("Accuracy", f"{eval_result.get('accuracy', 0):.2%}")
+                with eval_col2:
+                    st.metric("Precision", f"{eval_result.get('precision', 0):.2%}")
+                with eval_col3:
+                    st.metric("Recall", f"{eval_result.get('recall', 0):.2%}")
+                with eval_col4:
+                    st.metric("F1 Score", f"{eval_result.get('f1_score', 0):.2%}")
+            else:
+                st.warning(f"Model not trained yet or evaluation failed: {eval_result['error']}")
 
 if __name__ == "__main__":
     render()

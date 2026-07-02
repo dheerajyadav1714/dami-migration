@@ -12,7 +12,7 @@ class IntakeAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
         self.location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         
         # Check if GEMINI_API_KEY is available
         api_key = os.getenv("GEMINI_API_KEY")

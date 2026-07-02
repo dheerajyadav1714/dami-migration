@@ -103,6 +103,32 @@ def run_risk_scorer() -> str:
         trace["records_processed"] = res["assessed_count"]
     return f"Assessment complete. Classified {res['assessed_count']} servers into risk tiers and assigned 7R strategies."
 
+def train_bqml_risk_model() -> str:
+    """
+    Trains a BigQuery ML Logistic Regression model to predict whether a server
+    requires a complex migration strategy (Refactor/Replatform/Relocate) based
+    on resource metrics. After training, future risk assessments will use
+    ML.PREDICT to enhance heuristic scoring.
+    
+    Returns:
+        A status message indicating training success or failure.
+    """
+    with trace_agent("BQML Training", "specialist", "assess",
+                     "Training BQML logistic regression model for risk prediction",
+                     tools=["bigquery_ml.create_model", "bigquery_ml.evaluate"]) as trace:
+        agent = RiskScorerAgent()
+        result = agent.train_bqml_model()
+        eval_result = agent.evaluate_bqml_model()
+        trace["output_summary"] = result
+        trace["records_processed"] = 1
+        if "error" not in eval_result:
+            accuracy = eval_result.get("accuracy", 0)
+            precision = eval_result.get("precision", 0)
+            recall = eval_result.get("recall", 0)
+            f1 = eval_result.get("f1_score", 0)
+            return f"{result} Model evaluation — Accuracy: {accuracy:.2%}, Precision: {precision:.2%}, Recall: {recall:.2%}, F1: {f1:.2%}."
+    return result
+
 def run_architecture_designer() -> str:
     """
     Maps source workloads onto optimal target GCP cloud native services (GCE, GKE, Cloud SQL,
@@ -297,8 +323,9 @@ risk_scorer_agent = Agent(
     instruction="""You are the Risk Scorer Agent. You perform BQML-based risk scoring
     and assign Gartner 7R migration strategies (Rehost, Replatform, Refactor, Retire,
     Retain, Relocate, Repurchase) to every server. When asked to assess risk or classify
-    workloads, call run_risk_scorer.""",
-    tools=[run_risk_scorer]
+    workloads, call run_risk_scorer. When asked to train the BQML model, call
+    train_bqml_risk_model.""",
+    tools=[run_risk_scorer, train_bqml_risk_model]
 )
 
 # Phase 2: PLAN agents (sequential — architecture before waves)
@@ -413,6 +440,7 @@ orchestrator_agent = Agent(
         run_discovery_agent,
         run_dependency_mapper,
         run_risk_scorer,
+        train_bqml_risk_model,
         run_architecture_designer,
         run_wave_planner,
         run_artifacts_generator,

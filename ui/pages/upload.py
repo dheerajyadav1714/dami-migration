@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import plotly.express as px
 from google.cloud import bigquery
+from google.cloud import storage as gcs
 
 def get_hygiene_report(project_id, dataset):
     client = bigquery.Client(project=project_id)
@@ -58,6 +59,10 @@ def get_hygiene_report(project_id, dataset):
         }
 
 def render():
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    gcs_bucket = os.getenv("GCS_BUCKET", "dami-artifacts-cohort-2")
+    
     st.markdown("<h1 class='gradient-text'>Data Ingestion & Upload Center</h1>", unsafe_allow_html=True)
     st.write("Ingest raw data sources into D.A.M.I. using NVIDIA cuDF-accelerated pipelines and monitor data hygiene.")
     st.write("---")
@@ -181,6 +186,16 @@ def render():
                     st.info("Discovery Agent loading servers...")
                     load_res = agent.normalize_and_load(temp_inv_path, source_type=source_type)
                     st.success(f"Success! Normalized and loaded {load_res['loaded_count']} servers into BigQuery.")
+                    
+                    # Upload to Cloud Storage for durability
+                    try:
+                        gcs_client = gcs.Client(project=project_id)
+                        bucket = gcs_client.bucket(gcs_bucket)
+                        blob = bucket.blob(f"uploads/inventory/{inventory_file.name}")
+                        blob.upload_from_filename(temp_inv_path)
+                        st.info(f"☁️ Uploaded to Cloud Storage: `gs://{gcs_bucket}/uploads/inventory/{inventory_file.name}`")
+                    except Exception as gcs_err:
+                        st.caption(f"GCS upload skipped: {gcs_err}")
             else:
                 st.warning("Could not parse the uploaded file. Please check the format.")
         except Exception as e:
@@ -511,6 +526,58 @@ def render():
             st.info("No server data found in BigQuery. Upload inventory data above to generate quality analysis.")
     except Exception as e:
         st.warning(f"Data quality analysis unavailable: {e}")
+    
+    st.write("---")
+    
+    # --- Auto-Pipeline Trigger ---
+    st.subheader("🔄 Run Full Migration Pipeline")
+    st.write("After ingesting data, run the complete ASSESS → PLAN pipeline in one click. This chains: Dependency Mapper → Risk Scorer → Architecture Designer → Wave Planner.")
+    
+    if st.button("🚀 Run Full Pipeline (ASSESS → PLAN)", use_container_width=True, type="primary"):
+        pipeline_steps = [
+            ("Dependency Mapper", "Building network dependency graph..."),
+            ("Risk Scorer", "Running BQML risk scoring & 7R classification..."),
+            ("Architecture Designer", "Mapping workloads to GCP services..."),
+            ("Wave Planner", "Sequencing migration waves..."),
+        ]
+        
+        progress_bar = st.progress(0, text="Starting pipeline...")
+        results = []
+        
+        for i, (agent_name, description) in enumerate(pipeline_steps):
+            progress_bar.progress((i) / len(pipeline_steps), text=f"⏳ {description}")
+            
+            try:
+                if agent_name == "Dependency Mapper":
+                    from agents.dependency_mapper import DependencyMapperAgent
+                    agent = DependencyMapperAgent()
+                    G = agent.build_graph()
+                    results.append(f"✅ {agent_name}: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+                elif agent_name == "Risk Scorer":
+                    from agents.risk_scorer import RiskScorerAgent
+                    agent = RiskScorerAgent()
+                    res = agent.assess_workloads()
+                    results.append(f"✅ {agent_name}: Classified {res['assessed_count']} servers")
+                elif agent_name == "Architecture Designer":
+                    from agents.architecture_designer import ArchitectureDesignerAgent
+                    agent = ArchitectureDesignerAgent()
+                    res = agent.generate_architecture_mappings()
+                    results.append(f"✅ {agent_name}: Mapped {res['mapped_count']} servers to GCP")
+                elif agent_name == "Wave Planner":
+                    from agents.wave_planner import WavePlannerAgent
+                    agent = WavePlannerAgent()
+                    res = agent.create_migration_waves()
+                    results.append(f"✅ {agent_name}: Created {res['waves_count']} migration waves")
+            except Exception as e:
+                results.append(f"❌ {agent_name}: {str(e)[:80]}")
+        
+        progress_bar.progress(1.0, text="✅ Pipeline complete!")
+        
+        st.success("Full migration pipeline completed!")
+        for r in results:
+            st.write(r)
+        
+        st.balloons()
 
 if __name__ == "__main__":
     render()

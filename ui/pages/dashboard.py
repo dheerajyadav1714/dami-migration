@@ -618,14 +618,11 @@ def render():
                     name="Speedup (x)",
                     x=row_labels,
                     y=bench_df["speedup"],
-                    mode="lines+markers+text",
+                    mode="lines+markers",
                     yaxis="y2",
                     line=dict(color="#22d3ee", width=3),
                     marker=dict(size=10, color="#22d3ee", line=dict(width=2, color="#0891b2")),
-                    text=[f"{v:.1f}x" for v in bench_df["speedup"]],
-                    textposition="top center",
-                    textfont=dict(size=11, color="#22d3ee", family="monospace"),
-                    hovertemplate="%{x} rows<br>Speedup: %{text}<extra></extra>"
+                    hovertemplate="%{x} rows<br>Speedup: %{y:.1f}x<extra></extra>"
                 ))
                 
                 max_pandas = bench_df["pandas_ms"].max()
@@ -634,7 +631,7 @@ def render():
                     xaxis_title="Dataset Size (rows)",
                     yaxis_title="Processing Time (ms)",
                     yaxis=dict(range=[0, max_pandas * 1.15], gridcolor="rgba(100,116,139,0.1)"),
-                    yaxis2=dict(title="Speedup (x)", overlaying="y", side="right", showgrid=False, range=[0, max_speedup * 1.5]),
+                    yaxis2=dict(title="Speedup (x)", overlaying="y", side="right", showgrid=False, range=[0, max_speedup * 2.5]),
                     barmode="group",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",

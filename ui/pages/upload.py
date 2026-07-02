@@ -487,7 +487,13 @@ def render():
                     xaxis=dict(range=[0, 105]),
                     showlegend=False
                 )
-                fig.add_vline(x=95, line_dash="dash", line_color="#10b981", annotation_text="Target 95%", annotation_font_color="#10b981")
+                fig.add_vline(
+                    x=95, line_dash="dash", line_color="#10b981",
+                    annotation_text="Target 95%",
+                    annotation_font_color="#10b981",
+                    annotation_position="top right",
+                    annotation_font_size=10
+                )
                 st.plotly_chart(fig, use_container_width=True)
             
             with dq_right:

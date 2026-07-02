@@ -2,12 +2,13 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=True
+ENV PYTHONPATH=/app
 
 WORKDIR /app
 
-# Install system dependencies (graphviz for dependency graphs)
+# Install system dependencies (graphviz for dependency graphs, curl for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    graphviz \
+    graphviz curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -25,7 +26,6 @@ COPY scripts/ scripts/
 COPY ui/ ui/
 COPY .env.example .env.example
 COPY README.md README.md
-COPY SUBMISSION_SUMMARY.md SUBMISSION_SUMMARY.md
 
 # Create runtime directories
 RUN mkdir -p generated_assets/reports generated_assets/wave_0 \

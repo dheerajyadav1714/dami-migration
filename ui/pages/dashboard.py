@@ -600,9 +600,7 @@ def render():
                     marker_color="#ef4444",
                     marker_line_color="#dc2626",
                     marker_line_width=1,
-                    text=[f"{v:.0f}ms" for v in bench_df["pandas_ms"]],
-                    textposition="outside",
-                    textfont=dict(size=10, color="#f87171")
+                    hovertemplate="%{x} rows<br>Pandas: %{y:.0f}ms<extra></extra>"
                 ))
                 
                 fig.add_trace(go.Bar(
@@ -612,9 +610,7 @@ def render():
                     marker_color="#76b900",
                     marker_line_color="#5a8f00",
                     marker_line_width=1,
-                    text=[f"{v:.1f}ms" for v in bench_df["cudf_ms"]],
-                    textposition="outside",
-                    textfont=dict(size=10, color="#76b900")
+                    hovertemplate="%{x} rows<br>cuDF: %{y:.1f}ms<extra></extra>"
                 ))
                 
                 # Speedup line overlay
@@ -628,20 +624,23 @@ def render():
                     marker=dict(size=10, color="#22d3ee", line=dict(width=2, color="#0891b2")),
                     text=[f"{v:.1f}x" for v in bench_df["speedup"]],
                     textposition="top center",
-                    textfont=dict(size=11, color="#22d3ee", family="monospace")
+                    textfont=dict(size=11, color="#22d3ee", family="monospace"),
+                    hovertemplate="%{x} rows<br>Speedup: %{text}<extra></extra>"
                 ))
                 
+                max_pandas = bench_df["pandas_ms"].max()
                 fig.update_layout(
                     title=dict(text="NVIDIA RAPIDS cuDF vs Pandas — Processing Time", font=dict(color="#e2e8f0", size=14)),
                     xaxis_title="Dataset Size (rows)",
                     yaxis_title="Processing Time (ms)",
-                    yaxis2=dict(title="Speedup (x)", overlaying="y", side="right", showgrid=False, range=[0, max_speedup * 1.3]),
+                    yaxis=dict(range=[0, max_pandas * 1.15], gridcolor="rgba(100,116,139,0.1)"),
+                    yaxis2=dict(title="Speedup (x)", overlaying="y", side="right", showgrid=False, range=[0, max_speedup * 1.5]),
                     barmode="group",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     font=dict(color="#e2e8f0"),
-                    height=400,
-                    margin=dict(l=50, r=50, t=50, b=50),
+                    height=450,
+                    margin=dict(l=50, r=60, t=50, b=50),
                     legend=dict(
                         orientation="h",
                         yanchor="bottom",
@@ -651,7 +650,7 @@ def render():
                         font=dict(size=11)
                     ),
                     xaxis=dict(gridcolor="rgba(100,116,139,0.1)"),
-                    yaxis=dict(gridcolor="rgba(100,116,139,0.1)")
+                    bargap=0.25
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)

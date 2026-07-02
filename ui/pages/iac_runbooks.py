@@ -37,7 +37,30 @@ def read_local_file(wave_number, file_type):
                 return f.read()
         except Exception:
             pass
+    
+    # Fallback: query BigQuery iac_artifacts table
+    bq_type_map = {'tf': 'terraform', 'ansible': 'ansible', 'k8s': 'kubernetes', 'runbook': 'runbook'}
+    bq_artifact_type = bq_type_map.get(file_type)
+    if bq_artifact_type:
+        try:
+            project_id = os.getenv("GCP_PROJECT_ID")
+            dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+            client = bigquery.Client(project=project_id)
+            wave_id = f"wav-{wave_number:04d}"
+            query = f"""
+                SELECT content_preview 
+                FROM `{project_id}.{dataset}.iac_artifacts` 
+                WHERE wave_id = '{wave_id}' AND artifact_type = '{bq_artifact_type}'
+                LIMIT 1
+            """
+            df = client.query(query).to_dataframe()
+            if not df.empty and df.iloc[0]["content_preview"]:
+                return df.iloc[0]["content_preview"]
+        except Exception as e:
+            print(f"BQ artifact fallback failed: {e}")
+    
     return ""
+
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")

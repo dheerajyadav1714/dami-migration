@@ -263,20 +263,22 @@ def render():
                 st.session_state.messages.append({"role": "assistant", "content": response})
                 st.rerun()
             
-    # Chat Input
+    # Chat Input — don't render inline, just add to history and rerun
+    # This ensures suggestions always appear BELOW all messages
     if prompt := st.chat_input("Ask D.A.M.I a question..."):
-        # Add user message to history
         st.session_state.messages.append({"role": "user", "content": prompt})
-        
-        # Show spinner while getting response, then add to history and rerun
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        with st.chat_message("assistant"):
-            with st.spinner("⏳ Querying BigQuery and analyzing with Gemini..."):
-                response = get_orchestrator_response(prompt)
-            st.markdown(response)
-        
+        st.session_state["_chat_pending"] = True
+        st.rerun()
+    
+    # Process pending query after rerun (so user message shows immediately)
+    if st.session_state.get("_chat_pending"):
+        del st.session_state["_chat_pending"]
+        user_query = st.session_state.messages[-1]["content"]
+        with st.spinner("⏳ Querying BigQuery and analyzing with Gemini..."):
+            response = get_orchestrator_response(user_query)
         st.session_state.messages.append({"role": "assistant", "content": response})
+        st.rerun()
 
 if __name__ == "__main__":
     render()
+

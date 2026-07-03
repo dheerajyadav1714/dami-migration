@@ -35,173 +35,227 @@ def get_mappings(client, project_id, dataset):
     ]
     return pd.DataFrame(mock_mappings)
 
-def draw_graphviz_diagram(target_cloud):
+def draw_graphviz_diagram(target_cloud, df_mappings):
+    """Build a data-driven topology diagram from actual BigQuery target_architecture mappings."""
     dot = graphviz.Digraph(comment='Target Enterprise Architecture Map')
     
-    # Custom node colors and dark theme styling for high-end look
-    dot.attr(bgcolor='rgba(0,0,0,0)', fontname='Segoe UI', fontcolor='#e2e8f0', rankdir='TB')
-    dot.attr('node', shape='box', style='filled,rounded', fillcolor='#1e1e2f', fontname='Segoe UI', fontcolor='#e2e8f0', color='#6366f1', penwidth='1.5')
-    dot.attr('edge', color='#4b5563', arrowhead='normal', arrowsize='0.8', penwidth='1.2')
+    # Dark theme styling
+    dot.attr(bgcolor='rgba(0,0,0,0)', fontname='Segoe UI', fontcolor='#e2e8f0', rankdir='TB', nodesep='0.6', ranksep='0.8')
+    dot.attr('node', shape='box', style='filled,rounded', fillcolor='#1e1e2f', fontname='Segoe UI', fontcolor='#e2e8f0', color='#6366f1', penwidth='1.5', fontsize='10')
+    dot.attr('edge', color='#4b5563', arrowhead='normal', arrowsize='0.7', penwidth='1.0', fontsize='8', fontcolor='#94a3b8')
     
+    # Analyze actual data: group servers by target service
+    svc_col = "target_gcp_service" if "target_gcp_service" in df_mappings.columns else "target_service"
+    service_counts = df_mappings[svc_col].value_counts().to_dict() if svc_col in df_mappings.columns else {}
+    total_servers = len(df_mappings)
+    
+    # Service display names + colors per cloud
     if target_cloud == "Google Cloud":
-        # Subgraph: On-Premises Data Center
-        with dot.subgraph(name='cluster_onprem') as c:
-            c.attr(label='On-Premises Corporate Data Center', color='#ea4335', style='dashed', fontcolor='#ea4335')
-            c.node('VMware_ESXi', 'VMware vSphere Cluster\n(100 VMs / vCenter Server)')
-            c.node('Core_Switch', 'On-Prem Core Router / Switch\n(10G Fiber Uplinks)')
-            c.edge('VMware_ESXi', 'Core_Switch')
-            
-        # Subgraph: GCP Shared Hub Project
-        with dot.subgraph(name='cluster_gcp_hub') as c:
-            c.attr(label='GCP Transit Hub VPC Project', color='#4285f4', fontcolor='#4285f4')
-            c.node('Interconnect', 'Partner Interconnect Gateway\n(Cloud Router / VLAN Attachments)')
-            c.node('Cloud_NAT', 'Cloud NAT Subnet\n(Secure Outbound Egress)')
-            c.node('Firewall', 'Next-Gen Firewall Appliances\n(Palo Alto NGFW Active-Active MIG)')
-            c.node('GLB', 'Google Cloud HTTPS Load Balancing\n(Anycast Ingress WAF Shield)')
-            c.edge('Interconnect', 'Firewall')
-            c.edge('GLB', 'Firewall')
-            
-        # Subgraph: Spoke Workload Project
-        with dot.subgraph(name='cluster_gcp_spoke') as c:
-            c.attr(label='GCP Spoke Production Workload Project', color='#34a853', fontcolor='#34a853')
-            c.node('MIG_Web', 'Compute Engine Autoscaled MIG\n(Web Tier App Templates)')
-            c.node('GKE_App', 'GKE Autopilot GKE Cluster\n(Microservices Payment App)')
-            c.node('Cloud_SQL', 'Cloud SQL HA MySQL Instance\n(Database Storage Engine)', fillcolor='#8b5cf6')
-            c.node('Memorystore', 'Memorystore for Redis Cache\n(In-Memory App Cache)')
-            c.edge('MIG_Web', 'GKE_App')
-            c.edge('GKE_App', 'Cloud_SQL')
-            c.edge('GKE_App', 'Memorystore')
-
-        # Subgraph: GCVE Private Cloud
-        with dot.subgraph(name='cluster_gcve') as c:
-            c.attr(label='Google Cloud VMware Engine (GCVE)', color='#fbbc04', fontcolor='#fbbc04')
-            c.node('GCVE_ESXi', 'Dedicated VMware Engine Nodes\n(vSphere, vSAN & NSX-T)')
-            c.node('GCVE_Storage', 'vSAN NVMe Storage Datastore\n(Tier-1 Application Disks)')
-            c.node('HCX', 'VMware HCX Migration Appliance\n(L2 Network Stretch / vMotion)')
-            c.edge('GCVE_ESXi', 'GCVE_Storage')
-
-        # Subgraph: Shared Management & Security
-        with dot.subgraph(name='cluster_shared_ops') as c:
-            c.attr(label='Security & Operations Shared Project', color='#a78bfa', fontcolor='#a78bfa')
-            c.node('Secret_Manager', 'Cloud Secret Manager Vault\n(Secret Rotation)')
-            c.node('KMS', 'Cloud KMS Keyring\n(Envelope Encryption keys)')
-            c.node('Logging', 'Ops Agent Cloud Logging\n(Centralized Log Analytics)')
-            
-        # Connect On-Prem to Hub
-        dot.edge('Core_Switch', 'Interconnect', label='Dedicated Interconnect / VPN', color='#ea4335', penwidth='2.0')
-        # Connect HCX over Interconnect
-        dot.edge('Core_Switch', 'HCX', label='Stretch L2 Net', style='dashed', color='#fbbc04')
-        dot.edge('HCX', 'GCVE_ESXi', label='Live vMotion Path', color='#fbbc04', penwidth='2.0')
-        # Connect Hub to Spoke
-        dot.edge('Firewall', 'MIG_Web', label='VPC Peering', color='#34a853', style='dashed')
-        dot.edge('Firewall', 'GKE_App', label='VPC Peering', color='#34a853', style='dashed')
-        # Connect GCVE to Spoke Databases
-        dot.edge('GCVE_ESXi', 'Cloud_SQL', label='Private Service Access', style='dotted')
-        
+        svc_names = {
+            "compute-engine": "Compute Engine MIG", "gke": "GKE Autopilot Cluster",
+            "cloud-sql": "Cloud SQL HA Instance", "memorystore": "Memorystore Redis",
+            "bare-metal-solution": "Bare Metal Solution", "gcve": "GCVE VMware Engine Nodes",
+            "cloud-pubsub": "Cloud Pub/Sub", "cloud-load-balancing": "Cloud Load Balancing",
+            "cloud-dns": "Cloud DNS", "cloud-cdn": "Cloud CDN", "bigquery": "BigQuery",
+            "cloud-filestore": "Cloud Filestore", "cloud-identity": "Cloud Identity",
+        }
+        hub_label = "GCP Hub VPC Project (Transit Network)"
+        spoke_label = "GCP Spoke Production Workload Project"
+        vmware_label = "Google Cloud VMware Engine (GCVE) Private Cloud"
+        interconnect_name = "Cloud Interconnect Gateway\\n(Cloud Router / VLAN Attachments)"
+        firewall_name = "Cloud NGFW / Palo Alto NVA\\n(Centralized Inspection)"
+        lb_name = "Cloud HTTPS Load Balancer\\n(Anycast Global Ingress + WAF)"
+        nat_name = "Cloud NAT\\n(Secure Outbound Egress)"
+        dns_name = "Cloud DNS\\n(Private DNS Zones)"
+        vmware_nodes = [
+            ("GCVE_ESXi", "Dedicated VMware Engine Nodes\\n(vSphere 8.0 / vCenter Server)"),
+            ("GCVE_NSX", "NSX-T Manager\\n(Micro-Segmentation / T0-T1 Routing)"),
+            ("GCVE_vSAN", "vSAN NVMe Datastore\\n(All-Flash Storage Pool)"),
+            ("GCVE_HCX", "VMware HCX Connector\\n(L2 Stretch / Bulk vMotion)"),
+        ]
+        ops_nodes = [
+            ("Secret_Manager", "Cloud Secret Manager\\n(Automatic Rotation)"),
+            ("KMS", "Cloud KMS Keyring\\n(CMEK Encryption)"),
+            ("Logging", "Cloud Logging + Monitoring\\n(Ops Agent / SLO Dashboards)"),
+            ("Armor", "Cloud Armor WAF\\n(DDoS + OWASP Protection)"),
+        ]
     elif target_cloud == "AWS":
-        # Subgraph: On-Premises Data Center
-        with dot.subgraph(name='cluster_onprem') as c:
-            c.attr(label='On-Premises Corporate Data Center', color='#ea4335', style='dashed', fontcolor='#ea4335')
-            c.node('VMware_ESXi', 'VMware vSphere Cluster\n(100 VMs / vCenter Server)')
-            c.node('Core_Switch', 'On-Prem Core Router / Switch\n(10G Fiber Uplinks)')
-            c.edge('VMware_ESXi', 'Core_Switch')
-            
-        # Subgraph: AWS Transit Gateway Hub
-        with dot.subgraph(name='cluster_aws_hub') as c:
-            c.attr(label='AWS Hub Account (Transit Gateway)', color='#fbbc04', fontcolor='#fbbc04')
-            c.node('Direct_Connect', 'AWS Direct Connect Location\n(DX Gateway / Virtual Interfaces)')
-            c.node('TGW', 'AWS Transit Gateway Hub\n(Central Hub Router)')
-            c.node('ALB', 'Application Load Balancer (ALB)\n(HTTPS WAF Ingress)')
-            c.node('NAT_GW', 'NAT Gateway Outgress\n(Outbound NAT routing)')
-            c.edge('Direct_Connect', 'TGW')
-            c.edge('ALB', 'TGW')
-            
-        # Subgraph: Spoke Workload Account
-        with dot.subgraph(name='cluster_aws_spoke') as c:
-            c.attr(label='AWS Spoke Production Account', color='#34a853', fontcolor='#34a853')
-            c.node('EC2_ASG', 'EC2 Auto Scaling Group\n(Web Tier ASG VMs)')
-            c.node('EKS_App', 'Amazon EKS Fargate Cluster\n(Microservices Payment Pods)')
-            c.node('RDS_SQL', 'Amazon RDS MySQL Instance\n(Database Tier)', fillcolor='#8b5cf6')
-            c.node('ElastiCache', 'ElastiCache Redis Cache\n(Caching Layer)')
-            c.edge('EC2_ASG', 'EKS_App')
-            c.edge('EKS_App', 'RDS_SQL')
-            c.edge('EKS_App', 'ElastiCache')
-
-        # Subgraph: VMware Cloud on AWS (VMC)
-        with dot.subgraph(name='cluster_vmc') as c:
-            c.attr(label='VMware Cloud on AWS (VMC)', color='#4285f4', fontcolor='#4285f4')
-            c.node('VMC_ESXi', 'Dedicated ESXi Metal Hosts\n(vSphere & NSX-T Managers)')
-            c.node('VMC_vSAN', 'vSAN NVMe Storage Array')
-            c.node('VMC_HCX', 'VMware HCX Connector\n(L2 Live Migration Gateway)')
-            c.edge('VMC_ESXi', 'VMC_vSAN')
-
-        # Subgraph: Shared Security & Operations
-        with dot.subgraph(name='cluster_shared_ops') as c:
-            c.attr(label='AWS Operations Shared Account', color='#a78bfa', fontcolor='#a78bfa')
-            c.node('Secrets_Manager', 'AWS Secrets Manager Vault')
-            c.node('KMS', 'AWS KMS Master Keys')
-            c.node('CloudWatch', 'Amazon CloudWatch Analytics')
-            
-        # Connect On-Prem to TGW
-        dot.edge('Core_Switch', 'Direct_Connect', label='Direct Connect Fiber', color='#ea4335', penwidth='2.0')
-        # Connect HCX
-        dot.edge('Core_Switch', 'VMC_HCX', label='Stretch L2 Net', style='dashed', color='#fbbc04')
-        dot.edge('VMC_HCX', 'VMC_ESXi', label='Live vMotion Path', color='#fbbc04', penwidth='2.0')
-        # Connect TGW to Spoke
-        dot.edge('TGW', 'EC2_ASG', label='TGW Attachment', color='#34a853', style='dashed')
-        dot.edge('TGW', 'EKS_App', label='TGW Attachment', color='#34a853', style='dashed')
-        
+        svc_names = {
+            "compute-engine": "EC2 Auto Scaling Group", "gke": "Amazon EKS Fargate Cluster",
+            "cloud-sql": "Amazon RDS MySQL Instance", "memorystore": "ElastiCache Redis",
+            "bare-metal-solution": "EC2 Dedicated Host (Oracle)", "gcve": "VMC on AWS ESXi Hosts",
+            "cloud-pubsub": "Amazon SQS / SNS", "cloud-load-balancing": "Application Load Balancer",
+            "cloud-dns": "Route 53", "cloud-cdn": "CloudFront CDN", "bigquery": "Amazon Redshift",
+            "cloud-filestore": "Amazon EFS", "cloud-identity": "IAM Identity Center",
+        }
+        hub_label = "AWS Hub Account (Transit Gateway)"
+        spoke_label = "AWS Spoke Production Account"
+        vmware_label = "VMware Cloud on AWS (VMC)"
+        interconnect_name = "AWS Direct Connect\\n(DX Gateway / Virtual Interfaces)"
+        firewall_name = "AWS Network Firewall\\n(Centralized Inspection VPC)"
+        lb_name = "Application Load Balancer (ALB)\\n(HTTPS + WAF v2 Ingress)"
+        nat_name = "NAT Gateway\\n(Outbound Routing)"
+        dns_name = "Amazon Route 53\\n(Private Hosted Zones)"
+        vmware_nodes = [
+            ("VMC_ESXi", "Dedicated ESXi Metal Hosts\\n(vSphere 8.0 / SDDC Manager)"),
+            ("VMC_NSX", "NSX-T Manager\\n(Overlay Networking / DFW)"),
+            ("VMC_vSAN", "vSAN NVMe Storage Array\\n(First-Party Flash)"),
+            ("VMC_HCX", "VMware HCX Connector\\n(L2 Stretch / MON vMotion)"),
+        ]
+        ops_nodes = [
+            ("Secrets_Manager", "AWS Secrets Manager\\n(Automatic Rotation)"),
+            ("KMS", "AWS KMS CMK\\n(Envelope Encryption)"),
+            ("CloudWatch", "CloudWatch + CloudTrail\\n(Centralized Observability)"),
+            ("WAF", "AWS WAF v2\\n(OWASP + Bot Control)"),
+        ]
     else:  # Azure
-        # Subgraph: On-Premises Data Center
-        with dot.subgraph(name='cluster_onprem') as c:
-            c.attr(label='On-Premises Corporate Data Center', color='#ea4335', style='dashed', fontcolor='#ea4335')
-            c.node('VMware_ESXi', 'VMware vSphere Cluster\n(100 VMs / vCenter Server)')
-            c.node('Core_Switch', 'On-Prem Core Router / Switch\n(10G Fiber Uplinks)')
-            c.edge('VMware_ESXi', 'Core_Switch')
-            
-        # Subgraph: Azure Hub VNet
-        with dot.subgraph(name='cluster_azure_hub') as c:
-            c.attr(label='Azure Hub VNet Subscription', color='#6366f1', fontcolor='#6366f1')
-            c.node('ExpressRoute', 'Azure ExpressRoute Circuit\n(Virtual Network Gateway)')
-            c.node('Azure_Firewall', 'Azure Firewall Premium\n(Central NVA Routing)')
-            c.node('App_Gateway', 'Application Gateway v2\n(HTTPS WAF Ingress)')
-            c.edge('ExpressRoute', 'Azure_Firewall')
-            c.edge('App_Gateway', 'Azure_Firewall')
-            
-        # Subgraph: Azure Spoke VNet
-        with dot.subgraph(name='cluster_azure_spoke') as c:
-            c.attr(label='Azure Spoke Production Subscription', color='#34a853', fontcolor='#34a853')
-            c.node('VM_ScaleSets', 'VM Scale Sets (VMSS)\n(Web Tier IIS VMs)')
-            c.node('AKS_App', 'Azure Kubernetes Service (AKS)\n(Microservices Payment Pods)')
-            c.node('Azure_SQL', 'Azure DB for MySQL DB\n(Database Tier)', fillcolor='#8b5cf6')
-            c.node('Azure_Redis', 'Azure Cache for Redis\n(Caching Layer)')
-            c.edge('VM_ScaleSets', 'AKS_App')
-            c.edge('AKS_App', 'Azure_SQL')
-            c.edge('AKS_App', 'Azure_Redis')
+        svc_names = {
+            "compute-engine": "VM Scale Sets (VMSS)", "gke": "Azure Kubernetes Service (AKS)",
+            "cloud-sql": "Azure DB for MySQL", "memorystore": "Azure Cache for Redis",
+            "bare-metal-solution": "Azure Dedicated Host (Oracle)", "gcve": "AVS ESXi Nodes",
+            "cloud-pubsub": "Azure Service Bus", "cloud-load-balancing": "Azure App Gateway v2",
+            "cloud-dns": "Azure DNS", "cloud-cdn": "Azure Front Door / CDN", "bigquery": "Azure Synapse Analytics",
+            "cloud-filestore": "Azure Files", "cloud-identity": "Entra ID (Azure AD)",
+        }
+        hub_label = "Azure Hub VNet Subscription"
+        spoke_label = "Azure Spoke Production Subscription"
+        vmware_label = "Azure VMware Solution (AVS)"
+        interconnect_name = "ExpressRoute Circuit\\n(Virtual Network Gateway)"
+        firewall_name = "Azure Firewall Premium\\n(Central NVA + Forced Tunneling)"
+        lb_name = "Application Gateway v2\\n(HTTPS WAF Ingress)"
+        nat_name = "Azure NAT Gateway\\n(SNAT Outbound)"
+        dns_name = "Azure Private DNS\\n(Virtual Network Links)"
+        vmware_nodes = [
+            ("AVS_ESXi", "AVS Dedicated Metal Hosts\\n(vSphere 8.0 / vCenter Server)"),
+            ("AVS_NSX", "NSX-T Manager\\n(T0/T1 Gateways / DFW)"),
+            ("AVS_vSAN", "vSAN SSD Storage Pool\\n(All-Flash Datastore)"),
+            ("AVS_HCX", "VMware HCX Engine\\n(L2 Stretch / Bulk Migration)"),
+        ]
+        ops_nodes = [
+            ("Key_Vault", "Azure Key Vault\\n(Managed HSM)"),
+            ("Monitor", "Log Analytics Workspace\\n(Azure Monitor + Sentinel)"),
+            ("Defender", "Microsoft Defender for Cloud\\n(CSPM + CWP)"),
+            ("Policy", "Azure Policy\\n(Compliance Guardrails)"),
+        ]
 
-        # Subgraph: Azure VMware Solution (AVS)
-        with dot.subgraph(name='cluster_avs') as c:
-            c.attr(label='Azure VMware Solution (AVS)', color='#fbbc04', fontcolor='#fbbc04')
-            c.node('AVS_ESXi', 'AVS Dedicated Metal Hosts\n(vSphere & NSX-T Managers)')
-            c.node('AVS_vSAN', 'AVS vSAN SSD Storage Pool')
-            c.node('AVS_HCX', 'VMware HCX Engine\n(L2 Stretch Migration Path)')
-            c.edge('AVS_ESXi', 'AVS_vSAN')
-
-        # Subgraph: Shared Management & Governance
-        with dot.subgraph(name='cluster_shared_ops') as c:
-            c.attr(label='Azure Shared Management Subscription', color='#a78bfa', fontcolor='#a78bfa')
-            c.node('Key_Vault', 'Azure Key Vault')
-            c.node('Monitor', 'Azure Log Analytics Workspace')
+    # ========================
+    # CLUSTER: On-Premises
+    # ========================
+    with dot.subgraph(name='cluster_onprem') as c:
+        c.attr(label=f'On-Premises Corporate Data Center ({total_servers} VMs)', color='#ea4335', style='dashed', fontcolor='#ea4335')
+        c.node('VMware_ESXi', f'VMware vSphere Cluster\\n({total_servers} VMs / vCenter Server 8.0)')
+        c.node('Core_Switch', 'Core Router + L3 Switch\\n(10G/25G Fiber Uplinks)')
+        c.node('OnPrem_DNS', 'On-Prem DNS / DHCP\\n(Active Directory Integrated)')
+        c.edge('VMware_ESXi', 'Core_Switch')
+        c.edge('Core_Switch', 'OnPrem_DNS')
+    
+    # ========================
+    # CLUSTER: Hub / Transit Network
+    # ========================
+    with dot.subgraph(name='cluster_hub') as c:
+        c.attr(label=hub_label, color='#4285f4', fontcolor='#4285f4')
+        c.node('Interconnect', interconnect_name)
+        c.node('Firewall', firewall_name)
+        c.node('LB', lb_name)
+        c.node('NAT', nat_name)
+        c.node('DNS', dns_name)
+        c.edge('Interconnect', 'Firewall')
+        c.edge('LB', 'Firewall')
+        c.edge('Firewall', 'NAT')
+        c.edge('Firewall', 'DNS')
+    
+    # ========================
+    # CLUSTER: Workload Spoke (DATA-DRIVEN)
+    # ========================
+    with dot.subgraph(name='cluster_spoke') as c:
+        c.attr(label=spoke_label, color='#34a853', fontcolor='#34a853')
+        
+        # Categorize services into tiers
+        web_svcs = ["compute-engine", "cloud-load-balancing", "cloud-cdn"]
+        app_svcs = ["gke", "cloud-pubsub"]
+        db_svcs = ["cloud-sql", "memorystore", "bigquery", "cloud-filestore", "bare-metal-solution"]
+        
+        spoke_node_ids = []
+        
+        for svc_key, count in service_counts.items():
+            if svc_key in ["gcve"]:
+                continue  # GCVE gets its own cluster
+            display_name = svc_names.get(svc_key, svc_key)
+            node_id = f"svc_{svc_key.replace('-', '_')}"
             
-        # Connect On-Prem to ExpressRoute
-        dot.edge('Core_Switch', 'ExpressRoute', label='ExpressRoute Circuit', color='#ea4335', penwidth='2.0')
-        # Connect HCX
-        dot.edge('Core_Switch', 'AVS_HCX', label='Stretch L2 Net', style='dashed', color='#fbbc04')
-        dot.edge('AVS_HCX', 'AVS_ESXi', label='Live vMotion Path', color='#fbbc04', penwidth='2.0')
-        # Connect Hub to Spoke
-        dot.edge('Azure_Firewall', 'VM_ScaleSets', label='VNet Peering', color='#34a853', style='dashed')
-        dot.edge('Azure_Firewall', 'AKS_App', label='VNet Peering', color='#34a853', style='dashed')
-
+            # Color by tier
+            if svc_key in db_svcs:
+                fill = '#8b5cf6'
+            elif svc_key in app_svcs:
+                fill = '#22d3ee20'
+            else:
+                fill = '#1e1e2f'
+            
+            c.node(node_id, f'{display_name}\\n({count} workload{"s" if count > 1 else ""})', fillcolor=fill)
+            spoke_node_ids.append((node_id, svc_key))
+        
+        # Connect tiers: web → app → db
+        prev_web = None
+        prev_app = None
+        for node_id, svc_key in spoke_node_ids:
+            if svc_key in web_svcs:
+                prev_web = node_id
+            elif svc_key in app_svcs:
+                if prev_web:
+                    c.edge(prev_web, node_id, label='HTTP/gRPC')
+                prev_app = node_id
+            elif svc_key in db_svcs:
+                if prev_app:
+                    c.edge(prev_app, node_id, label='Private IP')
+                elif prev_web:
+                    c.edge(prev_web, node_id, label='Private IP')
+    
+    # ========================
+    # CLUSTER: VMware Engine (GCVE / VMC / AVS)
+    # ========================
+    gcve_count = service_counts.get("gcve", 0)
+    if gcve_count > 0:
+        with dot.subgraph(name='cluster_vmware') as c:
+            c.attr(label=f'{vmware_label} — {gcve_count} VMs', color='#fbbc04', fontcolor='#fbbc04')
+            for nid, nlabel in vmware_nodes:
+                c.node(nid, nlabel)
+            # Internal edges
+            c.edge(vmware_nodes[0][0], vmware_nodes[1][0])  # ESXi → NSX
+            c.edge(vmware_nodes[0][0], vmware_nodes[2][0])  # ESXi → vSAN
+    
+    # ========================
+    # CLUSTER: Security & Operations
+    # ========================
+    with dot.subgraph(name='cluster_ops') as c:
+        c.attr(label='Security & Operations', color='#a78bfa', fontcolor='#a78bfa')
+        for nid, nlabel in ops_nodes:
+            c.node(nid, nlabel)
+    
+    # ========================
+    # INTER-CLUSTER EDGES
+    # ========================
+    # On-Prem → Hub
+    dot.edge('Core_Switch', 'Interconnect', label='Dedicated Interconnect / VPN', color='#ea4335', penwidth='2.0')
+    
+    # Hub → Spoke (connect firewall to first spoke service)
+    for node_id, svc_key in spoke_node_ids[:2]:
+        dot.edge('Firewall', node_id, label='VPC Peering', color='#34a853', style='dashed')
+    
+    # GCVE migration path
+    if gcve_count > 0:
+        hcx_id = vmware_nodes[3][0]  # HCX connector
+        esxi_id = vmware_nodes[0][0]  # ESXi nodes
+        dot.edge('Core_Switch', hcx_id, label='L2 Stretch Network', style='dashed', color='#fbbc04')
+        dot.edge(hcx_id, esxi_id, label='Live vMotion', color='#fbbc04', penwidth='2.0')
+        # GCVE → Spoke DB connection
+        for node_id, svc_key in spoke_node_ids:
+            if svc_key in ["cloud-sql", "memorystore", "bigquery"]:
+                dot.edge(esxi_id, node_id, label='Private Service Access', style='dotted')
+                break
+    
+    # Ops connections
+    dot.edge(ops_nodes[2][0], 'Firewall', label='Telemetry', style='dotted', color='#a78bfa')
+    
     return dot
 
 def render():
@@ -239,20 +293,22 @@ def render():
     
     st.write(" ")
     
+    # Fetch mappings BEFORE tabs so both diagram and table can use them
+    df_mappings = get_mappings(client, project_id, dataset)
+    
     tab1, tab2 = st.tabs(["🗺️ Visual Topology Diagram", "🔍 Component Mapping Table"])
     
     with tab1:
         st.write(" ")
         st.subheader(f"Target Architecture Topology ({target_cloud})")
-        st.caption("Rendered dynamically based on computed rightsizing specifications.")
+        st.caption(f"Data-driven diagram generated from {len(df_mappings)} mapped workloads in BigQuery.")
         
-        # Draw dynamic Graphviz chart
-        dot_diagram = draw_graphviz_diagram(target_cloud)
+        # Draw data-driven Graphviz chart
+        dot_diagram = draw_graphviz_diagram(target_cloud, df_mappings)
         st.graphviz_chart(dot_diagram, use_container_width=True)
         
     with tab2:
         st.write(" ")
-        df_mappings = get_mappings(client, project_id, dataset)
         
         # Translate GCP target services to selected cloud provider services for visualization
         if target_cloud == "AWS":

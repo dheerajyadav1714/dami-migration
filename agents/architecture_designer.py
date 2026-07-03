@@ -105,7 +105,7 @@ No markdown fences. No explanation. ONLY valid JSON array."""
         db_query = f"SELECT server_id, db_engine, size_gb FROM `{self.project_id}.{self.dataset}.databases`"
         try:
             dbs_df = client.query(db_query).to_dataframe()
-            db_map = {row["server_id"]: row for _, row in dbs_df.iterrows()}
+            db_map = {row["server_id"]: row.to_dict() for _, row in dbs_df.iterrows()}
         except Exception:
             db_map = {}
 

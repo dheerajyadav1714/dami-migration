@@ -132,9 +132,12 @@ class RiskScorerAgent:
         app_by_srv = {}
         for _, row in apps_df.iterrows():
             server_list = row["server_ids"]
-            if server_list is not None:
-                for srv_id in server_list:
-                    app_by_srv[srv_id] = row["app_id"]
+            if server_list is not None and not (isinstance(server_list, float) and str(server_list) == 'nan'):
+                try:
+                    for srv_id in server_list:
+                        app_by_srv[srv_id] = row["app_id"]
+                except (TypeError, ValueError):
+                    pass
                     
         # In-degree / out-degree counts per app
         app_deps = {}
@@ -217,8 +220,9 @@ class RiskScorerAgent:
             
             # Compliance risk
             comp_risk = 0.0
-            if len(row["compliance_flags"]) > 0:
-                comp_risk = len(row["compliance_flags"]) * 2.5
+            comp_flags = row.get("compliance_flags", [])
+            if comp_flags is not None and not (isinstance(comp_flags, float)) and len(comp_flags) > 0:
+                comp_risk = len(comp_flags) * 2.5
                 
             # Overall score: weighted average boosted by BQML prediction
             heuristic_score = (complexity * 0.3) + (criticality * 0.3) + (tech_risk * 0.2) + (comp_risk * 0.2)

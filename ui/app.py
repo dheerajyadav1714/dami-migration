@@ -76,11 +76,14 @@ def inject_custom_css():
             border-radius: 8px !important;
             font-weight: 600 !important;
             box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3) !important;
-            transition: all 0.3s ease !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
         .stButton>button:hover {
-            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5) !important;
-            transform: translateY(-1px) !important;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.5), 0 4px 25px rgba(99, 102, 241, 0.4) !important;
+            transform: translateY(-2px) scale(1.02) !important;
+        }
+        .stButton>button:active {
+            transform: translateY(1px) scale(0.98) !important;
         }
         .stDownloadButton>button {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
@@ -96,26 +99,40 @@ def inject_custom_css():
 
         /* Tabs */
         .stTabs [data-baseweb="tab-list"] { gap: 4px; }
-        .stTabs [data-baseweb="tab"] { border-radius: 8px 8px 0 0; padding: 8px 16px; }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 8px 8px 0 0;
+            padding: 8px 16px;
+            transition: all 0.25s ease;
+        }
+        .stTabs [data-baseweb="tab"]:hover {
+            background: rgba(99, 102, 241, 0.1);
+        }
 
         /* Sidebar Nav */
         div[data-testid="stSidebar"] .stRadio > div { gap: 0px !important; }
         div[data-testid="stSidebar"] .stRadio label {
-            transition: all 0.2s ease;
-            padding: 6px 10px;
-            border-radius: 6px;
-            margin: 1px 0;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin: 2px 0;
             font-size: 0.88rem;
+            border-left: 3px solid transparent;
         }
         div[data-testid="stSidebar"] .stRadio label:hover {
-            background: rgba(99, 102, 241, 0.1);
+            background: rgba(99, 102, 241, 0.12);
             color: #a78bfa;
+            border-left-color: rgba(99, 102, 241, 0.4);
         }
         /* Hide radio label header */
         div[data-testid="stSidebar"] .stRadio > label { display: none !important; }
 
         /* Expanders */
-        details { border: 1px solid rgba(99, 102, 241, 0.15) !important; border-radius: 8px !important; }
+        details {
+            border: 1px solid rgba(99, 102, 241, 0.15) !important;
+            border-radius: 8px !important;
+            transition: border-color 0.3s ease;
+        }
+        details:hover { border-color: rgba(99, 102, 241, 0.3) !important; }
 
         /* Status Badges */
         .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
@@ -130,9 +147,13 @@ def inject_custom_css():
             border-radius: 10px;
         }
 
-        /* Sidebar Nav - text visibility */
+        /* Sidebar Nav - text visibility & active state */
         div[data-testid="stSidebar"] .stRadio label span {
             color: #cbd5e1 !important;
+        }
+        div[data-testid="stSidebar"] .stRadio label[data-checked="true"] {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 0%, transparent 100%) !important;
+            border-left: 3px solid #6366f1 !important;
         }
         div[data-testid="stSidebar"] .stRadio label[data-checked="true"] span {
             color: #a78bfa !important;
@@ -142,6 +163,66 @@ def inject_custom_css():
         div[data-testid="stSidebar"] .stRadio > label,
         div[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] {
             display: none !important;
+        }
+
+        /* ===== PREMIUM POLISH ===== */
+
+        /* Page fade-in animation */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .block-container {
+            animation: fadeInUp 0.35s ease-out forwards;
+        }
+
+        /* Chat bubble glassmorphism */
+        div[data-testid="stChatMessage"] {
+            backdrop-filter: blur(8px);
+            border-radius: 12px !important;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+        div[data-testid="stChatMessage"][data-testid*="user"] {
+            background: rgba(99, 102, 241, 0.06) !important;
+            border: 1px solid rgba(99, 102, 241, 0.12);
+        }
+        div[data-testid="stChatMessage"][data-testid*="assistant"] {
+            background: rgba(30, 30, 47, 0.35) !important;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        /* Metric card entrance animation */
+        @keyframes cardSlideIn {
+            from { opacity: 0; transform: translateY(8px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        div[data-testid="metric-container"] {
+            animation: cardSlideIn 0.4s ease-out forwards;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #07070d; }
+        ::-webkit-scrollbar-thumb { background: #1e1e2f; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+
+        /* Chat input styling */
+        div[data-testid="stChatInput"] textarea {
+            background: rgba(15, 15, 26, 0.8) !important;
+            border: 1px solid rgba(99, 102, 241, 0.25) !important;
+            border-radius: 10px !important;
+            color: #e2e8f0 !important;
+            transition: border-color 0.3s ease;
+        }
+        div[data-testid="stChatInput"] textarea:focus {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.2) !important;
+        }
+
+        /* Subheader styling */
+        h2, h3 {
+            letter-spacing: -0.02em;
         }
         </style>
     """, unsafe_allow_html=True)

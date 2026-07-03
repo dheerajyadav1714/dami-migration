@@ -21,17 +21,23 @@ class ArchitectureDesignerAgent:
         else:
             self.client = Client(enterprise=True)
 
-    def _ask_gemini(self, prompt: str) -> str:
+    def _ask_gemini(self, prompt: str, json_mode: bool = False) -> str:
         """Call Gemini model and return text response."""
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
+            config = types.GenerateContentConfig(
+                temperature=0.1,
+                max_output_tokens=16384,
+            )
+            if json_mode:
+                config = types.GenerateContentConfig(
                     temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json"
                 )
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=config
             )
             return response.text
         except Exception as e:
@@ -74,7 +80,7 @@ Respond with ONLY a JSON array. Each element:
 
 No markdown fences. No explanation. ONLY valid JSON array."""
 
-        result = self._ask_gemini(prompt)
+        result = self._ask_gemini(prompt, json_mode=True)
         if not result:
             return None
 
@@ -111,7 +117,7 @@ No markdown fences. No explanation. ONLY valid JSON array."""
             db_map = {}
 
         servers_list = servers_df.to_dict('records')
-        BATCH_SIZE = 5  # Small batches for reliable Gemini JSON parsing
+        BATCH_SIZE = 10  # Balance between speed and JSON reliability
         all_mappings = []
 
         for i in range(0, len(servers_list), BATCH_SIZE):

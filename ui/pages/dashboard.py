@@ -291,11 +291,10 @@ def render():
     with report_col2:
         if "exec_report" in st.session_state:
             st.download_button(
-                "⬇️ Download (.md)",
+                "⬇️ Download Report (.md)",
                 data=st.session_state["exec_report"],
                 file_name="DAMI_Executive_Report.md",
-                mime="text/markdown",
-                use_container_width=True
+                mime="text/markdown"
             )
         if "exec_report_pdf" in st.session_state:
             pdf_data = st.session_state["exec_report_pdf"]
@@ -303,11 +302,10 @@ def render():
                 pdf_data = bytes(pdf_data)
                 st.session_state["exec_report_pdf"] = pdf_data
             st.download_button(
-                "📕 Download (.pdf)",
+                "📕 Download Report (.pdf)",
                 data=pdf_data,
                 file_name="DAMI_Executive_Report.pdf",
-                mime="application/pdf",
-                use_container_width=True
+                mime="application/pdf"
             )
     with report_col3:
         st.metric("Migration Waves", f"{stats['total_waves']} Waves", delta="Sequenced")

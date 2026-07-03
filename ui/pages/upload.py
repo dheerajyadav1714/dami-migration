@@ -103,7 +103,7 @@ def render():
         
         if diagram_file is not None:
             # Display image
-            st.image(diagram_file, caption="Uploaded Architecture Diagram", use_column_width=True)
+            st.image(diagram_file, caption="Uploaded Architecture Diagram", width=None)
             
             if st.button("🔮 Analyze Diagram with Gemini Vision"):
                 st.info("Intake Agent analyzing diagram structure...")
@@ -120,7 +120,8 @@ def render():
                     res = agent.read_architecture_diagram(temp_path)
                     st.success("Analysis complete!")
                     st.write("**Extracted Components:**")
-                    st.json(res)
+                    import json as _json
+                    st.code(_json.dumps(res, indent=2, default=str), language="json")
                 except Exception as e:
                     st.error(f"Error executing Gemini Vision Intake: {e}")
                     

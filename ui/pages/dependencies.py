@@ -166,7 +166,12 @@ def render():
                 
                 with open(graph_path, "r", encoding="utf-8") as f:
                     html_content = f.read()
-                components.html(html_content, height=520, scrolling=False)
+                
+                # Use base64 data URI iframe to avoid Streamlit IFrame JS module failures on Cloud Run
+                import base64
+                b64_html = base64.b64encode(html_content.encode("utf-8")).decode("utf-8")
+                iframe_html = f'<iframe src="data:text/html;base64,{b64_html}" width="100%" height="520" style="border:none; border-radius:8px;"></iframe>'
+                st.markdown(iframe_html, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Interactive graph rendering failed: {e}")
             

@@ -122,6 +122,18 @@ def render():
                     st.write("**Extracted Components:**")
                     import json as _json
                     st.code(_json.dumps(res, indent=2, default=str), language="json")
+                    
+                    # Store analysis in BigQuery for architecture agents to use
+                    try:
+                        from agents.architecture_designer import ArchitectureDesignerAgent
+                        designer = ArchitectureDesignerAgent()
+                        stored = designer.store_diagram_analysis(res, diagram_file.name)
+                        if stored:
+                            st.info(f"✅ Analysis stored in BigQuery (`diagram_analysis` table) — {len(res.get('components', []))} components, {len(res.get('connections', []))} connections saved for architecture design.")
+                        else:
+                            st.warning("Analysis displayed but could not be saved to BigQuery.")
+                    except Exception as store_err:
+                        st.warning(f"Analysis displayed but storage failed: {store_err}")
                 except Exception as e:
                     st.error(f"Error executing Gemini Vision Intake: {e}")
                     

@@ -296,7 +296,7 @@ def render():
     # Fetch mappings BEFORE tabs so both diagram and table can use them
     df_mappings = get_mappings(client, project_id, dataset)
     
-    tab1, tab2 = st.tabs(["🗺️ Visual Topology Diagram", "🔍 Component Mapping Table"])
+    tab1, tab2, tab3 = st.tabs(["🗺️ Visual Topology Diagram", "🤖 AI-Generated Architecture (Gemini)", "🔍 Component Mapping Table"])
     
     with tab1:
         st.write(" ")
@@ -306,8 +306,36 @@ def render():
         # Draw data-driven Graphviz chart
         dot_diagram = draw_graphviz_diagram(target_cloud, df_mappings)
         st.graphviz_chart(dot_diagram, use_container_width=True)
-        
+    
     with tab2:
+        st.write(" ")
+        st.subheader(f"🤖 AI-Generated Enterprise Architecture ({target_cloud})")
+        st.caption("Gemini analyzes your actual migration data and generates a detailed architecture diagram with CIDR ranges, VPC structure, and proper service mappings.")
+        
+        if st.button("🧠 Generate Architecture with Gemini AI", use_container_width=True):
+            with st.spinner("Gemini is designing your enterprise architecture..."):
+                try:
+                    from agents.architecture_designer import ArchitectureDesignerAgent
+                    designer = ArchitectureDesignerAgent()
+                    dot_code = designer.generate_topology_dot(target_cloud)
+                    if dot_code:
+                        st.session_state["ai_topology_dot"] = dot_code
+                        st.success("AI architecture diagram generated!")
+                    else:
+                        st.error("Gemini could not generate the diagram. Try again.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        
+        if "ai_topology_dot" in st.session_state:
+            try:
+                st.graphviz_chart(st.session_state["ai_topology_dot"], use_container_width=True)
+            except Exception as e:
+                st.error(f"Diagram rendering error: {e}")
+                st.code(st.session_state["ai_topology_dot"], language="dot")
+        else:
+            st.info("Click the button above to generate an AI-powered architecture diagram from your real migration data.")
+        
+    with tab3:
         st.write(" ")
         
         # Translate GCP target services to selected cloud provider services for visualization

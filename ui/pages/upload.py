@@ -103,7 +103,7 @@ def render():
         
         if diagram_file is not None:
             # Display image
-            st.image(diagram_file, caption="Uploaded Architecture Diagram", width=None)
+            st.image(diagram_file, caption="Uploaded Architecture Diagram", width="stretch")
             
             if st.button("🔮 Analyze Diagram with Gemini Vision"):
                 st.info("Intake Agent analyzing diagram structure...")

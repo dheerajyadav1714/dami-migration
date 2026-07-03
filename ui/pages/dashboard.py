@@ -213,7 +213,7 @@ def render():
                     report_md = agent.generate_executive_report()
                     st.session_state["exec_report"] = report_md
                     
-                    # Generate PDF
+                    # Generate PDF version
                     try:
                         from fpdf import FPDF
                         
@@ -231,21 +231,25 @@ def render():
                         pdf.cell(0, 6, f"Generated: {pd.Timestamp.now().strftime('%B %d, %Y %H:%M')}", ln=True, align="C")
                         pdf.ln(8)
                         
-                        # KPI Section
+                        # KPIs
                         pdf.set_font("Helvetica", "B", 14)
                         pdf.set_text_color(30, 30, 30)
                         pdf.cell(0, 10, "Key Performance Indicators", ln=True)
                         pdf.set_font("Helvetica", "", 11)
                         pdf.set_text_color(60, 60, 60)
-                        pdf.cell(0, 7, f"  Discovered Servers: {stats['total_servers']} VMs", ln=True)
-                        pdf.cell(0, 7, f"  Business Applications: {stats['total_apps']}", ln=True)
-                        pdf.cell(0, 7, f"  Databases: {stats['total_dbs']}", ln=True)
-                        pdf.cell(0, 7, f"  Migration Waves: {stats['total_waves']}", ln=True)
-                        pdf.cell(0, 7, f"  Est. Annual Savings: ${stats['savings_val']:,.0f} ({stats['savings_pct']}%)", ln=True)
-                        pdf.cell(0, 7, f"  Migration Readiness Score: {overall_score}%", ln=True)
+                        kpis = [
+                            f"Discovered Servers: {stats['total_servers']} VMs",
+                            f"Business Applications: {stats['total_apps']}",
+                            f"Databases: {stats['total_dbs']}",
+                            f"Migration Waves: {stats['total_waves']}",
+                            f"Est. Annual Savings: ${stats['savings_val']:,.0f} ({stats['savings_pct']}%)",
+                            f"Migration Readiness Score: {overall_score}%",
+                        ]
+                        for kpi in kpis:
+                            pdf.cell(0, 7, f"  {kpi}", ln=True)
                         pdf.ln(5)
                         
-                        # Readiness breakdown
+                        # Readiness
                         pdf.set_font("Helvetica", "B", 14)
                         pdf.cell(0, 10, "Readiness Assessment", ln=True)
                         pdf.set_font("Helvetica", "", 11)
@@ -254,23 +258,29 @@ def render():
                             pdf.cell(0, 7, f"  {dim}: {score}% - {status}", ln=True)
                         pdf.ln(5)
                         
-                        # Report body (from markdown, simplified)
+                        # Report body
                         pdf.set_font("Helvetica", "B", 14)
                         pdf.cell(0, 10, "Detailed Analysis", ln=True)
-                        pdf.set_font("Helvetica", "", 10)
+                        pdf.set_font("Helvetica", "", 9)
                         for line in report_md.split("\n"):
-                            clean = line.strip().replace("**", "").replace("###", "").replace("##", "").replace("#", "")
-                            if clean:
+                            clean = line.strip()
+                            # Strip markdown formatting
+                            for ch in ["###", "##", "#", "**", "---", "```"]:
+                                clean = clean.replace(ch, "")
+                            clean = clean.strip()
+                            if clean and len(clean) > 1:
+                                safe_text = clean.encode('latin-1', 'replace').decode('latin-1')
                                 try:
-                                    pdf.multi_cell(0, 6, clean.encode('latin-1', 'replace').decode('latin-1'))
-                                except:
+                                    pdf.multi_cell(0, 5, safe_text)
+                                except Exception:
                                     pass
                         
                         st.session_state["exec_report_pdf"] = bytes(pdf.output())
+                        st.info("📕 PDF generated! Click 'Download Report (.pdf)' to save.")
                     except ImportError:
-                        pass  # fpdf2 not installed, skip PDF
+                        st.warning("PDF library (fpdf2) not available. Only .md download is available.")
                     except Exception as pdf_err:
-                        print(f"PDF generation failed: {pdf_err}")
+                        st.warning(f"PDF generation issue: {pdf_err}. Markdown download is still available.")
                     
                     # Save files to disk for easy access
                     save_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "generated_assets", "reports")

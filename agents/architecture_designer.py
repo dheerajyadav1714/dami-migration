@@ -29,7 +29,8 @@ class ArchitectureDesignerAgent:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.1,
-                    max_output_tokens=8192
+                    max_output_tokens=16384,
+                    response_mime_type="application/json"
                 )
             )
             return response.text
@@ -110,7 +111,7 @@ No markdown fences. No explanation. ONLY valid JSON array."""
             db_map = {}
 
         servers_list = servers_df.to_dict('records')
-        BATCH_SIZE = 15
+        BATCH_SIZE = 5  # Small batches for reliable Gemini JSON parsing
         all_mappings = []
 
         for i in range(0, len(servers_list), BATCH_SIZE):

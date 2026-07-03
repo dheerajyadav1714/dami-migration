@@ -29,7 +29,7 @@ class WavePlannerAgent:
         risk_df = client.query(
             f"SELECT server_id, overall_risk_score, risk_level, recommended_strategy FROM `{self.project_id}.{self.dataset}.risk_scores`"
         ).to_dataframe()
-        risk_map = {row["server_id"]: row for _, row in risk_df.iterrows()}
+        risk_map = {row["server_id"]: row.to_dict() for _, row in risk_df.iterrows()}
         
         # 3. Fetch app mappings & dependencies
         apps_df = client.query(
@@ -48,9 +48,12 @@ class WavePlannerAgent:
             
         for _, row in apps_df.iterrows():
             server_list = row["server_ids"]
-            if server_list is not None:
-                for srv_id in server_list:
-                    app_by_srv[srv_id] = row["app_id"]
+            if server_list is not None and not (isinstance(server_list, float) and str(server_list) == 'nan'):
+                try:
+                    for srv_id in server_list:
+                        app_by_srv[srv_id] = row["app_id"]
+                except (TypeError, ValueError):
+                    pass
                     
         # Construct graph at the server level (for fine-grained migration scheduling)
         G = nx.DiGraph()

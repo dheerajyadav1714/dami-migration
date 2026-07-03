@@ -546,50 +546,83 @@ def render():
     st.subheader("🔄 Run Full Migration Pipeline")
     st.write("After ingesting data, run the complete ASSESS → PLAN pipeline in one click. This chains: Dependency Mapper → Risk Scorer → Architecture Designer → Wave Planner.")
     
+    # Show last run results if available
+    if "pipeline_results" in st.session_state and not st.session_state.get("pipeline_running"):
+        st.info(f"✅ **Last pipeline run completed successfully.** Data has been updated in BigQuery — check Target Architecture, Risk Assessment, and Wave Gantt Chart pages for updated results.")
+        with st.expander("📋 View Last Run Results", expanded=False):
+            for r in st.session_state["pipeline_results"]:
+                st.write(r)
+    
     if st.button("🚀 Run Full Pipeline (ASSESS → PLAN)", use_container_width=True, type="primary"):
-        pipeline_steps = [
-            ("Dependency Mapper", "Building network dependency graph..."),
-            ("Risk Scorer", "Running BQML risk scoring & 7R classification..."),
-            ("Architecture Designer", "Mapping workloads to GCP services..."),
-            ("Wave Planner", "Sequencing migration waves..."),
-        ]
+        st.session_state["pipeline_running"] = True
         
-        progress_bar = st.progress(0, text="Starting pipeline...")
-        results = []
-        
-        for i, (agent_name, description) in enumerate(pipeline_steps):
-            progress_bar.progress((i) / len(pipeline_steps), text=f"⏳ {description}")
+        with st.status("🔄 Running migration pipeline...", expanded=True) as status:
+            results = []
             
+            # Step 1: Dependency Mapper
+            st.write("⏳ **Step 1/4**: Building network dependency graph...")
             try:
-                if agent_name == "Dependency Mapper":
-                    from agents.dependency_mapper import DependencyMapperAgent
-                    agent = DependencyMapperAgent()
-                    G = agent.build_graph()
-                    results.append(f"✅ {agent_name}: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
-                elif agent_name == "Risk Scorer":
-                    from agents.risk_scorer import RiskScorerAgent
-                    agent = RiskScorerAgent()
-                    res = agent.assess_workloads()
-                    results.append(f"✅ {agent_name}: Classified {res['assessed_count']} servers")
-                elif agent_name == "Architecture Designer":
-                    from agents.architecture_designer import ArchitectureDesignerAgent
-                    agent = ArchitectureDesignerAgent()
-                    res = agent.generate_architecture_mappings()
-                    results.append(f"✅ {agent_name}: Mapped {res['mapped_count']} servers to GCP")
-                elif agent_name == "Wave Planner":
-                    from agents.wave_planner import WavePlannerAgent
-                    agent = WavePlannerAgent()
-                    res = agent.create_migration_waves()
-                    results.append(f"✅ {agent_name}: Created {res['waves_count']} migration waves")
+                from agents.dependency_mapper import DependencyMapperAgent
+                agent = DependencyMapperAgent()
+                G = agent.build_graph()
+                msg = f"✅ **Dependency Mapper**: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges"
+                results.append(msg)
+                st.write(msg)
             except Exception as e:
-                results.append(f"❌ {agent_name}: {str(e)[:80]}")
+                msg = f"❌ **Dependency Mapper**: {str(e)[:100]}"
+                results.append(msg)
+                st.write(msg)
+            
+            # Step 2: Risk Scorer
+            st.write("⏳ **Step 2/4**: Running BQML risk scoring & 7R classification...")
+            try:
+                from agents.risk_scorer import RiskScorerAgent
+                agent = RiskScorerAgent()
+                res = agent.assess_workloads()
+                msg = f"✅ **Risk Scorer**: Classified {res['assessed_count']} servers"
+                results.append(msg)
+                st.write(msg)
+            except Exception as e:
+                msg = f"❌ **Risk Scorer**: {str(e)[:100]}"
+                results.append(msg)
+                st.write(msg)
+            
+            # Step 3: Architecture Designer (AI-powered, takes ~2 min)
+            st.write("⏳ **Step 3/4**: AI-powered architecture mapping (Gemini analyzing workloads, ~2 min)...")
+            try:
+                from agents.architecture_designer import ArchitectureDesignerAgent
+                agent = ArchitectureDesignerAgent()
+                res = agent.generate_architecture_mappings()
+                msg = f"✅ **Architecture Designer**: Mapped {res['mapped_count']} servers to GCP using Gemini AI"
+                results.append(msg)
+                st.write(msg)
+            except Exception as e:
+                msg = f"❌ **Architecture Designer**: {str(e)[:100]}"
+                results.append(msg)
+                st.write(msg)
+            
+            # Step 4: Wave Planner
+            st.write("⏳ **Step 4/4**: Sequencing migration waves...")
+            try:
+                from agents.wave_planner import WavePlannerAgent
+                agent = WavePlannerAgent()
+                res = agent.create_migration_waves()
+                msg = f"✅ **Wave Planner**: Created {res['waves_count']} migration waves"
+                results.append(msg)
+                st.write(msg)
+            except Exception as e:
+                msg = f"❌ **Wave Planner**: {str(e)[:100]}"
+                results.append(msg)
+                st.write(msg)
+            
+            # Done
+            st.session_state["pipeline_results"] = results
+            st.session_state["pipeline_running"] = False
+            
+            passed = sum(1 for r in results if r.startswith("✅"))
+            status.update(label=f"✅ Pipeline complete! ({passed}/4 agents succeeded)", state="complete", expanded=True)
         
-        progress_bar.progress(1.0, text="✅ Pipeline complete!")
-        
-        st.success("Full migration pipeline completed!")
-        for r in results:
-            st.write(r)
-        
+        st.success("🎉 **Pipeline complete!** All data has been updated in BigQuery. Navigate to **Target Architecture**, **Risk Assessment**, or **Wave Gantt Chart** to see the updated results.")
         st.balloons()
 
 if __name__ == "__main__":

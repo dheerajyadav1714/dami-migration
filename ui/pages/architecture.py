@@ -262,7 +262,14 @@ def render():
                 "cloud-sql": "Amazon RDS (MySQL)",
                 "memorystore": "Amazon ElastiCache (Redis)",
                 "bare-metal-solution": "EC2 Dedicated Host (Oracle)",
-                "cloud-pubsub": "Amazon SQS/SNS"
+                "cloud-pubsub": "Amazon SQS/SNS",
+                "gcve": "VMware Cloud on AWS (VMC)",
+                "cloud-load-balancing": "Elastic Load Balancer (ALB)",
+                "cloud-dns": "Amazon Route 53",
+                "cloud-cdn": "Amazon CloudFront",
+                "cloud-identity": "AWS IAM Identity Center",
+                "bigquery": "Amazon Redshift",
+                "cloud-filestore": "Amazon EFS",
             }
         elif target_cloud == "Microsoft Azure":
             translate_map = {
@@ -271,7 +278,14 @@ def render():
                 "cloud-sql": "Azure DB for MySQL",
                 "memorystore": "Azure Cache for Redis",
                 "bare-metal-solution": "Azure Dedicated Host (Oracle)",
-                "cloud-pubsub": "Azure Service Bus"
+                "cloud-pubsub": "Azure Service Bus",
+                "gcve": "Azure VMware Solution (AVS)",
+                "cloud-load-balancing": "Azure Application Gateway",
+                "cloud-dns": "Azure DNS",
+                "cloud-cdn": "Azure Front Door / CDN",
+                "cloud-identity": "Azure Active Directory",
+                "bigquery": "Azure Synapse Analytics",
+                "cloud-filestore": "Azure Files",
             }
         else:
             translate_map = {
@@ -280,7 +294,14 @@ def render():
                 "cloud-sql": "Cloud SQL (MySQL)",
                 "memorystore": "Cloud Memorystore (Redis)",
                 "bare-metal-solution": "Bare Metal Solution",
-                "cloud-pubsub": "Cloud Pub/Sub"
+                "cloud-pubsub": "Cloud Pub/Sub",
+                "gcve": "Google Cloud VMware Engine (GCVE)",
+                "cloud-load-balancing": "Cloud Load Balancing",
+                "cloud-dns": "Cloud DNS",
+                "cloud-cdn": "Cloud CDN",
+                "cloud-identity": "Cloud Identity",
+                "bigquery": "BigQuery",
+                "cloud-filestore": "Cloud Filestore",
             }
             
         df_display = df_mappings.copy()

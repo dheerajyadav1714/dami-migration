@@ -137,7 +137,32 @@ def draw_graphviz_diagram(target_cloud, df_mappings):
             ("Defender", "Microsoft Defender for Cloud\\n(CSPM + CWP)"),
             ("Policy", "Azure Policy\\n(Compliance Guardrails)"),
         ]
-
+    # ========================
+    # EXTRACT CIDR/SUBNET DATA from target_configuration
+    # ========================
+    cidr_map = {}  # svc_key -> {subnet, cidr}
+    total_monthly_cost = 0.0
+    try:
+        if "target_configuration" in df_mappings.columns:
+            import json as _json
+            for _, row in df_mappings.iterrows():
+                try:
+                    cfg = _json.loads(str(row.get("target_configuration", "{}")))
+                    svc = row.get(svc_col, "")
+                    if cfg.get("subnet_cidr") and svc not in cidr_map:
+                        cidr_map[svc] = {
+                            "subnet": cfg.get("subnet", "subnet-default"),
+                            "cidr": cfg.get("subnet_cidr", "10.1.0.0/24"),
+                            "vpc": cfg.get("vpc_network", "dami-prod-vpc"),
+                            "ha": cfg.get("high_availability", False),
+                        }
+                except Exception:
+                    pass
+        if "cost_estimate_monthly" in df_mappings.columns:
+            total_monthly_cost = df_mappings["cost_estimate_monthly"].sum()
+    except Exception:
+        pass
+    
     # ========================
     # CLUSTER: On-Premises
     # ========================
@@ -152,8 +177,9 @@ def draw_graphviz_diagram(target_cloud, df_mappings):
     # ========================
     # CLUSTER: Hub / Transit Network
     # ========================
+    vpc_name = list(cidr_map.values())[0]["vpc"] if cidr_map else "dami-prod-vpc"
     with dot.subgraph(name='cluster_hub') as c:
-        c.attr(label=hub_label, color='#4285f4', fontcolor='#4285f4')
+        c.attr(label=f'{hub_label}\\nVPC: {vpc_name} (10.0.0.0/16)', color='#4285f4', fontcolor='#4285f4')
         c.node('Interconnect', interconnect_name)
         c.node('Firewall', firewall_name)
         c.node('LB', lb_name)
@@ -165,33 +191,38 @@ def draw_graphviz_diagram(target_cloud, df_mappings):
         c.edge('Firewall', 'DNS')
     
     # ========================
-    # CLUSTER: Workload Spoke (DATA-DRIVEN)
+    # CLUSTER: Workload Spoke (DATA-DRIVEN + CIDR)
     # ========================
     with dot.subgraph(name='cluster_spoke') as c:
-        c.attr(label=spoke_label, color='#34a853', fontcolor='#34a853')
+        c.attr(label=f'{spoke_label}\\nSpoke CIDR: 10.1.0.0/20', color='#34a853', fontcolor='#34a853')
         
         # Categorize services into tiers
-        web_svcs = ["compute-engine", "cloud-load-balancing", "cloud-cdn"]
-        app_svcs = ["gke", "cloud-pubsub"]
-        db_svcs = ["cloud-sql", "memorystore", "bigquery", "cloud-filestore", "bare-metal-solution"]
+        web_svcs = ["compute-engine", "cloud-load-balancing", "cloud-cdn", "cloud-run"]
+        app_svcs = ["gke", "gke-autopilot", "cloud-pubsub", "cloud-functions"]
+        db_svcs = ["cloud-sql", "cloud-sql-mysql", "cloud-sql-postgres", "alloydb", "memorystore", "memorystore-redis", "bigquery", "cloud-filestore", "bare-metal-solution", "cloud-spanner"]
         
         spoke_node_ids = []
         
         for svc_key, count in service_counts.items():
             if svc_key in ["gcve"]:
                 continue  # GCVE gets its own cluster
-            display_name = svc_names.get(svc_key, svc_key)
+            display_name = svc_names.get(svc_key, svc_key.replace("-", " ").title())
             node_id = f"svc_{svc_key.replace('-', '_')}"
+            
+            # Add CIDR/subnet info if available
+            cidr_info = cidr_map.get(svc_key, {})
+            subnet_label = f"\\n{cidr_info['subnet']} ({cidr_info['cidr']})" if cidr_info.get("cidr") else ""
+            ha_label = " [HA]" if cidr_info.get("ha") else ""
             
             # Color by tier
             if svc_key in db_svcs:
                 fill = '#8b5cf6'
             elif svc_key in app_svcs:
-                fill = '#22d3ee20'
+                fill = '#0e7490'
             else:
                 fill = '#1e1e2f'
             
-            c.node(node_id, f'{display_name}\\n({count} workload{"s" if count > 1 else ""})', fillcolor=fill)
+            c.node(node_id, f'{display_name}\\n({count} workload{"s" if count > 1 else ""}){ha_label}{subnet_label}', fillcolor=fill)
             spoke_node_ids.append((node_id, svc_key))
         
         # Connect tiers: web → app → db
@@ -216,7 +247,7 @@ def draw_graphviz_diagram(target_cloud, df_mappings):
     gcve_count = service_counts.get("gcve", 0)
     if gcve_count > 0:
         with dot.subgraph(name='cluster_vmware') as c:
-            c.attr(label=f'{vmware_label} — {gcve_count} VMs', color='#fbbc04', fontcolor='#fbbc04')
+            c.attr(label=f'{vmware_label} — {gcve_count} VMs\\nCIDR: 10.2.0.0/20', color='#fbbc04', fontcolor='#fbbc04')
             for nid, nlabel in vmware_nodes:
                 c.node(nid, nlabel)
             # Internal edges
@@ -230,6 +261,16 @@ def draw_graphviz_diagram(target_cloud, df_mappings):
         c.attr(label='Security & Operations', color='#a78bfa', fontcolor='#a78bfa')
         for nid, nlabel in ops_nodes:
             c.node(nid, nlabel)
+    
+    # ========================
+    # CLUSTER: Cost & Network Summary
+    # ========================
+    if total_monthly_cost > 0 or cidr_map:
+        with dot.subgraph(name='cluster_summary') as c:
+            c.attr(label='Network & Cost Summary', color='#10b981', fontcolor='#10b981', style='dashed')
+            cost_str = f"${total_monthly_cost:,.0f}/mo" if total_monthly_cost > 0 else "Calculating..."
+            annual_str = f"${total_monthly_cost * 12:,.0f}/yr" if total_monthly_cost > 0 else ""
+            c.node('cost_summary', f'Estimated Cloud Cost\\n{cost_str} ({annual_str})\\n{total_servers} workloads across {len(service_counts)} services', fillcolor='#064e3b', shape='note')
     
     # ========================
     # INTER-CLUSTER EDGES
@@ -249,7 +290,7 @@ def draw_graphviz_diagram(target_cloud, df_mappings):
         dot.edge(hcx_id, esxi_id, label='Live vMotion', color='#fbbc04', penwidth='2.0')
         # GCVE → Spoke DB connection
         for node_id, svc_key in spoke_node_ids:
-            if svc_key in ["cloud-sql", "memorystore", "bigquery"]:
+            if svc_key in ["cloud-sql", "cloud-sql-mysql", "cloud-sql-postgres", "memorystore", "memorystore-redis", "bigquery"]:
                 dot.edge(esxi_id, node_id, label='Private Service Access', style='dotted')
                 break
     

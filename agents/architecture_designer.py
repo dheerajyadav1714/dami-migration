@@ -46,20 +46,29 @@ class ArchitectureDesignerAgent:
 
     def _ai_recommend_services(self, servers_batch: list, db_map: dict) -> list:
         """Use Gemini AI to recommend the BEST target cloud service for each server.
-        Not limited to a fixed list — AI picks from ALL GCP services."""
+        Not limited to a fixed list — AI picks from ALL GCP services.
+        Enhanced with dependency graph, diagram analysis, and compliance context."""
         server_summaries = []
         for srv in servers_batch:
             db_info = db_map.get(srv["server_id"])
             db_str = f", Database: {db_info['db_engine']} ({db_info['size_gb']}GB)" if db_info else ""
+            env = srv.get("environment", "unknown")
+            risk_score = srv.get("overall_risk_score", 5.0)
+            compliance = srv.get("compliance_risk_score", 0.0)
             server_summaries.append(
                 f"- ID: {srv['server_id']}, Name: {srv['name']}, "
-                f"OS: {srv['os']}, Workload: {srv['workload_type']}, "
-                f"CPU: {srv['vcpu']}vCPU @ {srv['cpu_utilization_avg']:.0f}% util, "
-                f"RAM: {srv['ram_gb']}GB @ {srv['ram_utilization_avg']:.0f}% util, "
+                f"OS: {srv['os']}, Workload: {srv['workload_type']}, Env: {env}, "
+                f"CPU: {srv['vcpu']}vCPU @ {srv.get('cpu_utilization_avg', 10):.0f}% util, "
+                f"RAM: {srv['ram_gb']}GB @ {srv.get('ram_utilization_avg', 20):.0f}% util, "
                 f"Disk: {srv['disk_gb']}GB, "
-                f"Strategy: {srv['recommended_strategy']}, Risk: {srv['risk_level']}"
+                f"Strategy: {srv.get('recommended_strategy', 'rehost')}, "
+                f"Risk: {srv.get('risk_level', 'medium')} ({risk_score:.1f}/10), "
+                f"Compliance: {compliance:.1f}/10"
                 f"{db_str}"
             )
+
+        # Include enrichment context if available
+        enrichment = getattr(self, '_enrichment_context', '')
 
         prompt = f"""You are a Senior Google Cloud Architect. Analyze each server and recommend the BEST GCP target service.
 
@@ -70,8 +79,10 @@ RULES:
 - For "refactor": Cloud Run for stateless/low-traffic, GKE for microservices, Cloud Functions for event-driven.
 - For "rehost": Compute Engine with proper family (e2=dev/test, n2=general prod, c3=compute-intensive, n2-highmem=memory-intensive).
 - Rightsize if CPU util < 15% and RAM < 30%.
+- Consider compliance score: high compliance (>7) needs private networking, encryption, audit logging.
+- Consider environment: PROD needs HA & multi-zone, DEV/TEST can be single-zone and preemptible.
 - Estimate realistic monthly cost in USD.
-
+{enrichment}
 SERVERS:
 {chr(10).join(server_summaries)}
 
@@ -96,25 +107,73 @@ No markdown fences. No explanation. ONLY valid JSON array."""
 
     def generate_architecture_mappings(self) -> dict:
         """Uses Gemini AI to recommend the best target GCP service for each server.
+        Enriches prompts with dependency graph, diagram analysis, and compliance data.
         Falls back to heuristic rules if Gemini is unavailable."""
         print("Starting AI-powered architecture design mapping...")
         client = bigquery.Client(project=self.project_id)
 
+        # 1. Core server + risk data
         query = f"""
             SELECT s.server_id, s.name, s.vcpu, s.ram_gb, s.disk_gb, s.os, s.workload_type,
-                   s.cpu_utilization_avg, s.ram_utilization_avg,
-                   r.recommended_strategy, r.risk_level
+                   s.cpu_utilization_avg, s.ram_utilization_avg, s.environment, s.power_state,
+                   r.recommended_strategy, r.risk_level, r.overall_risk_score,
+                   r.compliance_risk_score
             FROM `{self.project_id}.{self.dataset}.servers` s
             JOIN `{self.project_id}.{self.dataset}.risk_scores` r ON s.server_id = r.server_id
         """
         servers_df = client.query(query).to_dataframe()
 
+        # 2. Database info
         db_query = f"SELECT server_id, db_engine, size_gb FROM `{self.project_id}.{self.dataset}.databases`"
         try:
             dbs_df = client.query(db_query).to_dataframe()
             db_map = {row["server_id"]: row.to_dict() for _, row in dbs_df.iterrows()}
         except Exception:
             db_map = {}
+
+        # 3. Dependency graph context — helps AI understand workload relationships
+        dep_context = ""
+        try:
+            dep_df = client.query(
+                f"SELECT source_app_id, target_app_id, protocol, port FROM `{self.project_id}.{self.dataset}.app_dependencies`"
+            ).to_dataframe()
+            if not dep_df.empty:
+                dep_summary = dep_df.groupby("protocol").size().to_dict()
+                high_connectivity = dep_df["source_app_id"].value_counts().head(5).to_dict()
+                dep_context = (
+                    f"\nDEPENDENCY CONTEXT:\n"
+                    f"- Total dependencies: {len(dep_df)}\n"
+                    f"- Protocols: {dep_summary}\n"
+                    f"- Highest connectivity apps: {high_connectivity}\n"
+                    f"- Key ports: {sorted(dep_df['port'].unique().tolist())}\n"
+                )
+        except Exception:
+            pass
+
+        # 4. Uploaded architecture diagram analysis — real infrastructure patterns
+        diagram_context = ""
+        try:
+            diag_df = client.query(
+                f"SELECT analysis_json FROM `{self.project_id}.{self.dataset}.diagram_analysis` "
+                f"ORDER BY analyzed_at DESC LIMIT 1"
+            ).to_dataframe()
+            if not diag_df.empty:
+                diag_json = diag_df.iloc[0]["analysis_json"]
+                # Truncate to fit token limits but include key patterns
+                diagram_context = f"\nEXISTING ARCHITECTURE (from uploaded diagrams):\n{str(diag_json)[:1500]}\n"
+        except Exception:
+            pass
+
+        # 5. Environment distribution summary
+        env_summary = ""
+        try:
+            env_counts = servers_df["environment"].value_counts().to_dict()
+            env_summary = f"\nENVIRONMENT DISTRIBUTION: {env_counts}\n"
+        except Exception:
+            pass
+
+        # Combine enrichment context for prompts
+        self._enrichment_context = dep_context + diagram_context + env_summary
 
         servers_list = servers_df.to_dict('records')
         BATCH_SIZE = 10  # Balance between speed and JSON reliability
@@ -158,7 +217,7 @@ No markdown fences. No explanation. ONLY valid JSON array."""
                         mapping["mapping_id"] = f"map-{len(all_mappings):04d}"
                         all_mappings.append(mapping)
 
-        # Write to BigQuery
+        # Write to BigQuery - target_architecture (full details for UI)
         table_ref = client.dataset(self.dataset).table("target_architecture")
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
@@ -167,7 +226,27 @@ No markdown fences. No explanation. ONLY valid JSON array."""
             job = client.load_table_from_json(all_mappings, table_ref, job_config=job_config)
             job.result()
         except Exception as e:
-            raise Exception(f"BigQuery load error: {e}")
+            raise Exception(f"BigQuery load error (target_architecture): {e}")
+
+        # Also write simplified mappings for downstream agents (wave_planner)
+        try:
+            arch_records = []
+            for m in all_mappings:
+                arch_records.append({
+                    "server_id": m.get("source_component_id", ""),
+                    "target_gcp_service": m.get("target_gcp_service", "compute-engine"),
+                    "target_machine_type": m.get("target_machine_type", "n2-standard-4"),
+                    "target_region": m.get("target_region", "us-central1"),
+                    "cost_estimate_monthly": m.get("cost_estimate_monthly", 0.0),
+                    "ai_reasoning": m.get("ai_reasoning", ""),
+                    "project_id": self.project_id
+                })
+            arch_table = client.dataset(self.dataset).table("architecture_mappings")
+            job = client.load_table_from_json(arch_records, arch_table, job_config=job_config)
+            job.result()
+            print(f"  Also wrote {len(arch_records)} records to architecture_mappings for wave planner.")
+        except Exception as e:
+            print(f"  Warning: Could not write architecture_mappings: {e}")
 
         print(f"AI architecture mapping complete. Mapped {len(all_mappings)} resources.")
         return {"mapped_count": len(all_mappings)}

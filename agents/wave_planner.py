@@ -1,5 +1,6 @@
 # wave_planner.py
 import os
+import json
 from datetime import date, timedelta
 from google.cloud import bigquery
 import networkx as nx
@@ -11,6 +12,68 @@ class WavePlannerAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
         self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self._init_gemini()
+    
+    def _init_gemini(self):
+        """Initialize Gemini client."""
+        try:
+            from google import genai
+            from google.genai import types
+            self.genai_types = types
+            vertex_project = os.getenv("VERTEX_PROJECT_ID", self.project_id)
+            location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
+            self.client = genai.Client(
+                vertexai=True, project=vertex_project, location=location
+            )
+        except Exception as e:
+            print(f"Gemini init failed: {e}")
+            self.client = None
+    
+    def _ask_gemini(self, prompt: str) -> str:
+        """Call Gemini for AI-powered wave analysis."""
+        if not self.client:
+            return None
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=self.genai_types.GenerateContentConfig(
+                    temperature=0.2,
+                    max_output_tokens=4096,
+                    response_mime_type="application/json"
+                )
+            )
+            return response.text
+        except Exception as e:
+            print(f"Gemini wave analysis failed: {e}")
+            return None
+    
+    def _ai_generate_wave_details(self, wave_num: int, server_names: list, strategies: list, risk_levels: list) -> dict:
+        """Use Gemini to generate smart wave name, rationale, risk mitigation."""
+        prompt = f"""You are an enterprise cloud migration architect. Generate details for Migration Wave {wave_num}.
+
+Workloads in this wave:
+- Server names: {server_names[:15]}
+- Migration strategies: {list(set(strategies))}
+- Risk levels: {list(set(risk_levels))}
+- Count: {len(server_names)} servers
+
+Return a JSON object with:
+{{
+  "wave_name": "<descriptive 3-5 word name based on workload types, e.g. 'Core Database Migration', 'Frontend Web Services', 'Legacy System Replatform'>",
+  "rationale": "<2-3 sentence technical rationale for why these workloads are grouped together and sequenced at this point>",
+  "risk_mitigation": "<specific risk mitigation strategy for this wave's workloads>",
+  "success_criteria": "<measurable success criteria specific to these workloads>",
+  "rollback_strategy": "<specific rollback plan for this wave>"
+}}"""
+        result = self._ask_gemini(prompt)
+        if result:
+            try:
+                return json.loads(result)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return None
         
     def create_migration_waves(self, max_per_wave: int = 25) -> dict:
         """
@@ -168,18 +231,19 @@ class WavePlannerAgent:
         
         start_date = date.today() + timedelta(days=14)
         
-        wave_names = {
-            0: "Pilot Wave",
-            1: "Core Web & Frontend Services",
-            2: "Middle-Tier Applications",
-            3: "Core Databases & Backends",
-            4: "Complex & Legacy Workloads",
-            5: "Decommissioning & Cleanup"
-        }
+        # Fetch architecture mappings for target services (from AI-powered architecture designer)
+        arch_map = {}
+        try:
+            arch_df = client.query(
+                f"SELECT server_id, target_gcp_service, target_machine_type, target_region FROM `{self.project_id}.{self.dataset}.architecture_mappings`"
+            ).to_dataframe()
+            arch_map = {row["server_id"]: row.to_dict() for _, row in arch_df.iterrows()}
+        except Exception:
+            pass  # Architecture mappings may not exist yet
         
         for w_num, srv_list in waves.items():
             w_id = f"wav-000{w_num}"
-            duration = len(srv_list) * 0.5 + 3.0 # simulated duration
+            duration = len(srv_list) * 0.5 + 3.0
             duration = int(max(5, duration))
             
             end_date = start_date + timedelta(days=duration)
@@ -189,44 +253,59 @@ class WavePlannerAgent:
             avg_score = sum(wave_scores) / len(wave_scores) if wave_scores else 0.0
             w_risk = "low" if avg_score < 4.0 else "high" if avg_score >= 7.0 else "medium"
             
+            # Collect wave metadata for AI
+            wave_server_names = [srv_name_by_id.get(s, s) for s in srv_list]
+            wave_strategies = [risk_map.get(s, {}).get("recommended_strategy", "rehost") for s in srv_list]
+            wave_risk_levels = [risk_map.get(s, {}).get("risk_level", "medium") for s in srv_list]
+            
+            # AI-generated wave details
+            ai_details = self._ai_generate_wave_details(w_num, wave_server_names, wave_strategies, wave_risk_levels)
+            
+            # Fallback names if AI fails
+            fallback_names = {
+                0: "Pilot Wave",
+                1: "Core Web & Frontend Services",
+                2: "Middle-Tier Applications",
+                3: "Core Databases & Backends",
+                4: "Complex & Legacy Workloads",
+                5: "Decommissioning & Cleanup"
+            }
+            
+            wave_name = (ai_details or {}).get("wave_name", fallback_names.get(w_num, f"Migration Wave {w_num}"))
+            rationale = (ai_details or {}).get("rationale", f"Wave {w_num} targets workloads ordered by dependency sequence. Risk Profile: {w_risk.upper()}.")
+            success_criteria = (ai_details or {}).get("success_criteria", "All application traffic cutover. Target latency metrics satisfied. Zero data loss.")
+            rollback_strategy = (ai_details or {}).get("rollback_strategy", "Surgical route reversion via Cloud DNS. Restore databases from final pre-migration snapshots.")
+            
             wave_records.append({
                 "wave_id": w_id,
                 "wave_number": w_num,
-                "wave_name": wave_names.get(w_num, f"Migration Wave {w_num}"),
+                "wave_name": wave_name,
                 "wave_type": "pilot" if w_num == 0 else "complex" if w_risk == "high" else "standard",
                 "estimated_start_date": start_date.isoformat(),
                 "estimated_end_date": end_date.isoformat(),
                 "estimated_duration_days": duration,
-                "rationale": f"Wave {w_num} targets workloads ordered by dependency sequence. Risk Profile: {w_risk.upper()}.",
+                "rationale": rationale,
                 "risk_level": w_risk,
                 "workload_count": len(srv_list),
                 "total_servers": len(srv_list),
                 "total_databases": sum(1 for s in srv_list if risk_map.get(s, {}).get("recommended_strategy") == "replatform"),
                 "prerequisites": f"Wave {w_num-1} verification completed successfully" if w_num > 0 else "Landing Zone established",
-                "success_criteria": "All application traffic cutover. Target latency metrics satisfied. Zero data loss.",
-                "rollback_strategy": "Surgical route reversion via Cloud DNS. Restore databases from final pre-migration snapshots.",
+                "success_criteria": success_criteria,
+                "rollback_strategy": rollback_strategy,
                 "project_id": self.project_id
             })
             
             for idx, srv_id in enumerate(srv_list):
                 risk_info = risk_map.get(srv_id, {})
                 strategy = risk_info.get("recommended_strategy", "rehost")
+                srv_name = srv_name_by_id.get(srv_id, "")
                 
-                # Determine target GCP service based on strategy and type
-                srv_name = srv_name_by_id[srv_id]
-                target_service = "compute-engine"
-                if strategy == "replatform":
-                    if "MYSQL" in srv_name.upper():
-                        target_service = "cloud-sql"
-                    elif "REDIS" in srv_name.upper():
-                        target_service = "memorystore"
-                    elif "RABBIT" in srv_name.upper():
-                        target_service = "cloud-pubsub"
-                elif strategy == "refactor":
-                    target_service = "gke"
-                elif strategy == "relocate":
-                    target_service = "bare-metal-solution" if "ORACLE" in srv_name else "gcve"
-                    
+                # Pull target service from architecture_mappings (AI-generated) or fallback
+                arch_info = arch_map.get(srv_id, {})
+                target_service = arch_info.get("target_gcp_service", "compute-engine")
+                target_machine = arch_info.get("target_machine_type", "n2-standard-4")
+                target_region = arch_info.get("target_region", "us-central1")
+                
                 workload_records.append({
                     "wave_id": w_id,
                     "server_id": srv_id,
@@ -234,8 +313,8 @@ class WavePlannerAgent:
                     "sequence_in_wave": idx + 1,
                     "migration_approach": strategy,
                     "target_gcp_service": target_service,
-                    "target_machine_type": "n2-standard-2" if "WEB" in srv_name else "n2-standard-4" if "APP" in srv_name else "n2-highmem-4",
-                    "target_region": "us-central1",
+                    "target_machine_type": target_machine,
+                    "target_region": target_region,
                     "prerequisites": [],
                     "estimated_hours": float(risk_info.get("estimated_effort_days", 2) * 8.0),
                     "project_id": self.project_id

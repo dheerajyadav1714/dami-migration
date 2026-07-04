@@ -181,8 +181,32 @@ class RiskScorerAgent:
             model_exists = False
             
         for idx, row in servers_df.iterrows():
-            srv_id = row["server_id"]
-            srv_name = row["name"]
+            # Convert pandas row to clean dict with safe defaults for NA/NaN values
+            srv = {}
+            for col in row.index:
+                val = row[col]
+                # Replace NA/NaN with sensible defaults
+                if val is None or (isinstance(val, float) and str(val) == 'nan'):
+                    if col in ('vcpu',): srv[col] = 2
+                    elif col in ('ram_gb',): srv[col] = 4.0
+                    elif col in ('cpu_utilization_avg', 'ram_utilization_avg'): srv[col] = 10.0
+                    elif col in ('last_access_days',): srv[col] = 0
+                    elif col in ('compliance_flags',): srv[col] = []
+                    elif col in ('power_state',): srv[col] = 'poweredOn'
+                    elif col in ('os', 'name', 'server_id', 'workload_type', 'environment'): srv[col] = ''
+                    else: srv[col] = val
+                else:
+                    try:
+                        import pandas as pd
+                        if pd.isna(val):
+                            srv[col] = '' if isinstance(val, str) else 0
+                            continue
+                    except (TypeError, ValueError):
+                        pass
+                    srv[col] = val
+            
+            srv_id = srv.get("server_id", "")
+            srv_name = srv.get("name", "")
             
             # Dependency count
             app_id = app_by_srv.get(srv_id)
@@ -191,11 +215,11 @@ class RiskScorerAgent:
             has_db = srv_id in db_servers
             
             # Determine 7R strategy
-            strategy, rationale, effort, downtime = self.determine_7r_strategy(row, dep_count, has_db)
+            strategy, rationale, effort, downtime = self.determine_7r_strategy(srv, dep_count, has_db)
             
             # Calculate risk scores (0.0 to 10.0)
             # Complexity score: CPU utilization + RAM + disk size + dependency count
-            complexity = (int(row["vcpu"]) * 0.2) + (float(row["ram_gb"]) * 0.05) + (dep_count * 0.8)
+            complexity = (int(srv.get("vcpu", 2)) * 0.2) + (float(srv.get("ram_gb", 4.0)) * 0.05) + (dep_count * 0.8)
             complexity = min(10.0, max(1.0, complexity))
             
             # Business criticality: default to 5, higher for prod/payment
@@ -211,9 +235,10 @@ class RiskScorerAgent:
                 
             # Technical risk: EOL OS, high utilization, powered off
             tech_risk = 2.0
-            if "2008" in row["os"] or "7" in row["os"] or "18.04" in row["os"]:
+            os_name = str(srv.get("os", ""))
+            if "2008" in os_name or "7" in os_name or "18.04" in os_name:
                 tech_risk += 4.0  # EOL OS risk
-            if float(row["cpu_utilization_avg"]) > 75.0 or float(row["ram_utilization_avg"]) > 80.0:
+            if float(srv.get("cpu_utilization_avg", 10.0)) > 75.0 or float(srv.get("ram_utilization_avg", 20.0)) > 80.0:
                 tech_risk += 3.0  # resource pressure risk
                 
             tech_risk = min(10.0, tech_risk)

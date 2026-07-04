@@ -36,6 +36,7 @@
 | **NVIDIA RAPIDS cuDF** | GPU Acceleration | 28.7x faster data processing at 100K rows |
 | **NVIDIA GPU** | Hardware | Benchmarked on RTX 4050 (local dev); production-ready for T4/A100 on GKE |
 | **Gemini Vision** | Multimodal AI | Extracts architecture components from uploaded diagrams (PNG/draw.io) |
+| **Looker Studio** | BI/Visualization | Executive migration dashboard embedded in Streamlit (live BigQuery data) |
 
 ---
 

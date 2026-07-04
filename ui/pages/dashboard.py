@@ -716,6 +716,15 @@ def render():
     except Exception as bench_err:
         st.info(f"RAPIDS benchmarks unavailable: {bench_err}")
 
+    # ── Looker Studio Executive Dashboard ──
+    st.write("---")
+    st.subheader("📊 Executive Dashboard — Looker Studio")
+    st.caption("Interactive BigQuery analytics powered by Looker Studio. Designed for executive stakeholders.")
+
+    LOOKER_URL = "https://datastudio.google.com/embed/reporting/56bf16f7-97ce-45a8-8354-f5bfcffe6d0d/page/EKu2F"
+
+    st.components.v1.iframe(LOOKER_URL, height=800, scrolling=True)
+
 
 if __name__ == "__main__":
     render()

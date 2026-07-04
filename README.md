@@ -34,7 +34,8 @@
 | **Cloud Run** | Compute | Serverless deployment (auto-scaling, pay-per-request) |
 | **Google ADK** | Agent Framework | Multi-agent workflow DAG orchestration |
 | **NVIDIA RAPIDS cuDF** | GPU Acceleration | 28.7x faster data processing at 100K rows |
-| **NVIDIA GPU** | Hardware | RTX 4050 (6GB GDDR6) — scales to T4/A100 on GKE |
+| **NVIDIA GPU** | Hardware | Benchmarked on RTX 4050 (local dev); production-ready for T4/A100 on GKE |
+| **Gemini Vision** | Multimodal AI | Extracts architecture components from uploaded diagrams (PNG/draw.io) |
 
 ---
 
@@ -160,6 +161,35 @@ D.A.M.I. automatically routes queries to the optimal Gemini model:
 
 ---
 
+## 🖼️ Multimodal AI — Architecture Diagram Analysis
+
+D.A.M.I. uses **Gemini Vision** to extract infrastructure components from uploaded architecture diagrams:
+
+1. **Upload** existing on-premises architecture diagrams (PNG, JPEG, draw.io exports)
+2. **Gemini Vision** analyzes the image and extracts: VM components, network topology, database tiers, firewall rules, load balancers
+3. **Results stored** in BigQuery `diagram_analysis` table
+4. **Fed into AI agents** — Architecture Designer uses diagram context for richer GCP service recommendations
+
+> Zero manual data entry from diagrams — upload a whiteboard photo of your datacenter, and D.A.M.I. understands it.
+
+---
+
+## 🎯 Quick Demo (for Judges)
+
+> Follow these 5 steps to see D.A.M.I. in action:
+
+| Step | Page | What You'll See |
+|---|---|---|
+| 1 | **Dashboard** | KPI grid, readiness gauge, acceleration impact (500x), NVIDIA benchmark |
+| 2 | **Upload Center** | Upload a CSV → GPU benchmark runs → data flows to BigQuery |
+| 3 | **Risk Assessment** | BQML risk heatmap + Gartner 7R strategy distribution |
+| 4 | **Target Architecture** | AI-recommended GCP services + multi-cloud topology with CIDR ranges |
+| 5 | **Chat** | Ask "How many high risk servers?" → NL→SQL→BigQuery in real-time |
+
+**Bonus pages:** Wave Gantt Chart (AI sequencing), IaC & Runbooks (Terraform generation), Compliance (HIPAA/PCI-DSS gap analysis)
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -233,6 +263,14 @@ dami-migration/
 ├── requirements-cloud.txt     # Cloud Run dependencies
 └── README.md
 ```
+
+---
+
+## 👤 Team
+
+| Name | Role |
+|---|---|
+| **Dheeraj Yadav** | Full-stack developer — agents, UI, deployment |
 
 ---
 

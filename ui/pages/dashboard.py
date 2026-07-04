@@ -203,6 +203,51 @@ def render():
             """, unsafe_allow_html=True)
     
     st.write("---")
+    
+    # ── Acceleration Impact ──
+    st.subheader("⚡ Acceleration Impact — Why D.A.M.I. Exists")
+    
+    accel_col1, accel_col2, accel_col3 = st.columns(3)
+    
+    with accel_col1:
+        st.markdown("""
+        <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 18px; text-align: center;">
+            <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Traditional Consulting</div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: #ef4444; margin: 8px 0;">6-18 months</div>
+            <div style="font-size: 0.75rem; color: #94a3b8;">Manual spreadsheets, interviews,<br>external consultants @ $300/hr</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with accel_col2:
+        st.markdown("""
+        <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 18px; text-align: center;">
+            <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">D.A.M.I. AI Pipeline</div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: #10b981; margin: 8px 0;">~8 minutes</div>
+            <div style="font-size: 0.75rem; color: #94a3b8;">4 AI agents + BQML + Gemini<br>GPU-accelerated data processing</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with accel_col3:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(118,185,0,0.1)); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 18px; text-align: center;">
+            <div style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Acceleration Factor</div>
+            <div style="font-size: 2.2rem; font-weight: 800; color: #6366f1; margin: 8px 0;">500x+</div>
+            <div style="font-size: 0.75rem; color: #94a3b8;">Faster time-to-decision<br>with richer data-driven insights</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Pipeline timing breakdown
+    with st.expander("📊 Pipeline Agent Timing Breakdown"):
+        timing_data = [
+            {"Agent": "⚡ Dependency Mapper", "Task": "Build network graph (123 nodes, 129 edges)", "Time": "~2 sec", "Manual Equivalent": "2-3 weeks"},
+            {"Agent": "⚡ Risk Scorer", "Task": "BQML 7R classification (100 servers)", "Time": "~5 sec", "Manual Equivalent": "4-6 weeks"},
+            {"Agent": "🧠 Architecture Designer", "Task": "Gemini AI service mapping (10 batches)", "Time": "~7 min", "Manual Equivalent": "6-8 weeks"},
+            {"Agent": "🧠 Wave Planner", "Task": "AI wave sequencing + rationale", "Time": "~30 sec", "Manual Equivalent": "2-4 weeks"},
+        ]
+        st.dataframe(pd.DataFrame(timing_data), use_container_width=True, hide_index=True)
+        st.caption("💡 **Total AI Pipeline: ~8 minutes** vs Manual Assessment: **6-18 months**. This is the core acceleration story.")
+    
+    st.write("---")
     report_col1, report_col2, report_col3 = st.columns([1, 1, 1])
     with report_col1:
         if st.button("📄 Generate Executive Report", use_container_width=True):

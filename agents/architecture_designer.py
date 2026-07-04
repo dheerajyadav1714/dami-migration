@@ -117,7 +117,7 @@ No markdown fences. No explanation. ONLY valid JSON array."""
             SELECT s.server_id, s.name, s.vcpu, s.ram_gb, s.disk_gb, s.os, s.workload_type,
                    s.cpu_utilization_avg, s.ram_utilization_avg, s.environment, s.power_state,
                    r.recommended_strategy, r.risk_level, r.overall_risk_score,
-                   r.compliance_risk_score
+                   r.compliance_risk AS compliance_risk_score
             FROM `{self.project_id}.{self.dataset}.servers` s
             JOIN `{self.project_id}.{self.dataset}.risk_scores` r ON s.server_id = r.server_id
         """

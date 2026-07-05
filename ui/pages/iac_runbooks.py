@@ -268,8 +268,8 @@ resource "google_compute_instance" "dev_test_vm_01" {
     
     with tab_tf:
         st.write(" ")
-        st.subheader("GCP Infrastructure Provisioning (Terraform)")
-        st.caption("Generated automatically by Gemini Cloud Architect Agent with right-sized configurations.")
+        st.subheader(f"{target_cloud} Infrastructure Provisioning (Terraform)")
+        st.caption(f"Generated automatically by Gemini Cloud Architect Agent with right-sized {target_cloud} configurations.")
         
         st.code(tf_code, language="hcl")
         if tf_code and "Generate" not in tf_code:

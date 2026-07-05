@@ -267,41 +267,9 @@ def render():
 
         error_div = f"<div style='font-size: 0.72rem; color: #ef4444; margin-top: 2px;'>⚠️ {error[:100]}</div>" if error else ""
         
-        st.markdown(f"""
-<div style="
-    background: rgba(30, 30, 47, 0.5);
-    border-left: 4px solid {border_color};
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-">
-    <div style="font-size: 1.4rem;">{icon}</div>
-    <div style="flex: 1;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-weight: 600; color: #e2e8f0;">{agent}</span>
-            <span style="
-                background: {phase_color}22;
-                color: {phase_color};
-                padding: 2px 8px;
-                border-radius: 4px;
-                font-size: 0.7rem;
-                font-weight: 600;
-                text-transform: uppercase;
-            ">{phase}</span>
-        </div>
-        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">
-            {output[:120]}
-        </div>
-        <div style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">
-            ⏱️ {dur}ms &nbsp;|&nbsp; 📊 {records:,} records &nbsp;|&nbsp; 🔧 Tools: {tools_str}
-        </div>
-        {error_div}
-    </div>
-</div>
-        """, unsafe_allow_html=True)
+        card_html = f'<div style="background: rgba(30, 30, 47, 0.5); border-left: 4px solid {border_color}; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 16px;"><div style="font-size: 1.4rem;">{icon}</div><div style="flex: 1;"><div style="display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: 600; color: #e2e8f0;">{agent}</span><span style="background: {phase_color}22; color: {phase_color}; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;">{phase}</span></div><div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">{output[:120]}</div><div style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">⏱️ {dur}ms &nbsp;|&nbsp; 📊 {records:,} records &nbsp;|&nbsp; 🔧 Tools: {tools_str}</div>{error_div}</div></div>'
+        
+        st.markdown(card_html, unsafe_allow_html=True)
 
     st.write("---")
 

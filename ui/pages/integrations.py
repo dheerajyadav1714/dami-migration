@@ -115,12 +115,40 @@ def render():
                 st.rerun()
 
     st.write("---")
-    st.subheader("🔒 Secure Vault Credential Storage Status")
+    # Premium Secure Vault Card Styling
     st.markdown("""
-    All credentials entered on this portal are encrypted and stored in a **Google Cloud Secret Manager** secure vault instance, referencing access controls under KMS.
-    - **Encryption Standard:** AES-256-GCM
-    - **Service Account Link:** `dami-migration-runner@cohort-2-497207.iam.gserviceaccount.com`
-    """)
+        <div style="background-color: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 8px; padding: 20px; margin-top: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin: 0; color: #10b981; font-family: 'Outfit', 'Inter', sans-serif; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                    🔒 Secure Vault Credential Storage Status
+                </h3>
+                <span style="background-color: rgba(16, 185, 129, 0.1); color: #10b981; font-size: 0.72rem; font-weight: 600; padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2); display: flex; align-items: center; gap: 6px;">
+                    <span style="display: inline-block; width: 6px; height: 6px; background-color: #10b981; border-radius: 50%; animation: pulse-green 2s infinite;"></span>
+                    ACTIVE & ENCRYPTED
+                </span>
+            </div>
+            <p style="margin: 0 0 16px 0; color: #a3a8b4; font-size: 0.88rem; line-height: 1.5;">
+                All credentials entered on this portal are encrypted using envelope encryption and stored securely in a dedicated <strong>Google Cloud Secret Manager</strong> instance, referencing access controls managed under KMS.
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 0.8rem;">
+                <div style="background-color: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                    <div style="color: #6b7280; margin-bottom: 4px; font-weight: 500; font-size: 0.7rem; letter-spacing: 0.05em;">ENCRYPTION STANDARD</div>
+                    <div style="color: #ffffff; font-family: monospace; font-weight: 600;">AES-256-GCM</div>
+                </div>
+                <div style="background-color: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                    <div style="color: #6b7280; margin-bottom: 4px; font-weight: 500; font-size: 0.7rem; letter-spacing: 0.05em;">AUTHORIZED SERVICE ACCOUNT</div>
+                    <div style="color: #10b981; font-family: monospace; word-break: break-all; font-weight: 600;">dami-migration-runner@cohort-2-497207.iam.gserviceaccount.com</div>
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes pulse-green {
+                0% { opacity: 0.3; transform: scale(0.95); }
+                50% { opacity: 1; transform: scale(1.05); }
+                100% { opacity: 0.3; transform: scale(0.95); }
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     render()

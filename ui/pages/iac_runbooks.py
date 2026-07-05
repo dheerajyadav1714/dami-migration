@@ -37,8 +37,31 @@ def read_local_file(wave_number, file_type):
                 return f.read()
         except Exception:
             pass
+            
+    # GCS Fallback: Download the full file directly from Google Cloud Storage
+    try:
+        project_id = os.getenv("GCP_PROJECT_ID")
+        bucket_name = os.getenv("GCS_BUCKET", "dami-artifacts-cohort-2")
+        from google.cloud import storage as gcs
+        gcs_client = gcs.Client(project=project_id)
+        bucket = gcs_client.bucket(bucket_name)
+        blob_path = f"iac-artifacts/wave_{wave_number}/{file_name}"
+        blob = bucket.blob(blob_path)
+        if blob.exists():
+            content = blob.download_as_text(encoding="utf-8")
+            if content:
+                # Write to ephemeral container file system for subsequent fast access
+                try:
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                except Exception:
+                    pass
+                return content
+    except Exception as e:
+        print(f"GCS read fallback failed: {e}")
     
-    # Fallback: query BigQuery iac_artifacts table
+    # Second Fallback: query BigQuery iac_artifacts table (truncated preview)
     bq_type_map = {'tf': 'terraform', 'ansible': 'ansible', 'k8s': 'kubernetes', 'runbook': 'runbook'}
     bq_artifact_type = bq_type_map.get(file_type)
     if bq_artifact_type:

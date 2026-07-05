@@ -11,6 +11,8 @@ ENV/
 
 # Environment Variables
 .env
+.dami_vault.json
+.dami_kms_key
 
 # IDE
 .gemini/

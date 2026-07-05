@@ -152,7 +152,7 @@ D.A.M.I. automatically routes queries to the optimal Gemini model:
 
 ---
 
-## 📊 Key Features (14 Pages)
+## 📊 Key Features
 
 | Feature | Description |
 |---|---|

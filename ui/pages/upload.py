@@ -225,18 +225,21 @@ def render():
         # Load stored results from BigQuery
         try:
             bq_client = bigquery.Client(project=project_id)
-            bench_df = bq_client.query(f"SELECT * FROM `{project_id}.{dataset}.rapids_benchmarks` ORDER BY rows").to_dataframe()
+            bench_df = bq_client.query(f"SELECT * FROM `{project_id}.{dataset}.rapids_benchmarks` ORDER BY `rows`").to_dataframe()
             if not bench_df.empty:
-                st.success(f"Stored benchmark from: **{bench_df.iloc[0]['gpu_device']}**")
                 scale_df = bench_df.rename(columns={"rows": "dataset_size"})
                 scale_df["cpu_time_sec"] = scale_df["pandas_ms"] / 1000
                 scale_df["gpu_time_sec"] = scale_df["cudf_ms"] / 1000
+                scale_df["speedup_ratio"] = scale_df["speedup"]
+                scale_df["cpu_label"] = scale_df["pandas_ms"].apply(lambda x: f"{x:.1f}ms")
+                scale_df["gpu_label"] = scale_df["cudf_ms"].apply(lambda x: f"{x:.2f}ms")
                 
-                scaling = {
+                st.session_state["_benchmark_data"] = {
+                    "scale_df": scale_df,
                     "gpu_device": bench_df.iloc[0]["gpu_device"],
-                    "scale_results": scale_df.to_dict("records")
+                    "source": "Stored (BigQuery)"
                 }
-                st.session_state["_benchmark_data"] = (scale_df, scaling)
+                st.rerun()
             else:
                 st.warning("No stored benchmarks found. Run a live benchmark first.")
         except Exception as e:
@@ -249,9 +252,22 @@ def render():
         with st.spinner("Running benchmark across 6 dataset sizes — measuring live CPU times..."):
             scaling = agent.run_scaling_benchmark()
         
-        st.success(f"Benchmark complete! Device: **{scaling['gpu_device']}**")
-        
         scale_df = pd.DataFrame(scaling["scale_results"])
+        st.session_state["_benchmark_data"] = {
+            "scale_df": scale_df,
+            "gpu_device": scaling["gpu_device"],
+            "source": "Live GPU Execution"
+        }
+        st.rerun()
+        
+    # Render benchmark results if loaded in session state
+    if "_benchmark_data" in st.session_state:
+        bench_data = st.session_state["_benchmark_data"]
+        scale_df = bench_data["scale_df"]
+        gpu_device = bench_data["gpu_device"]
+        source = bench_data["source"]
+        
+        st.success(f"Benchmark results loaded from **{source}** • Device: **{gpu_device}**")
         
         # --- Chart 1: Execution Time Scaling Curve ---
         import plotly.graph_objects as go
@@ -301,7 +317,7 @@ def render():
                 y=scale_df["speedup_ratio"],
                 name="GPU Speedup Factor",
                 mode="lines+markers+text",
-                text=[f"{r}x" for r in scale_df["speedup_ratio"]],
+                text=[f"{r:.1f}x" for r in scale_df["speedup_ratio"]],
                 textposition="top center",
                 textfont=dict(color="#76b900", size=11),
                 line=dict(color="#76b900", width=3),
@@ -328,7 +344,7 @@ def render():
             display_df = scale_df[["dataset_size", "cpu_label", "gpu_label", "speedup_ratio"]].copy()
             display_df.columns = ["Dataset Size", "CPU Time", "GPU Time", "Speedup"]
             display_df["Dataset Size"] = display_df["Dataset Size"].apply(lambda x: f"{x:,}")
-            display_df["Speedup"] = display_df["Speedup"].apply(lambda x: f"{x}x")
+            display_df["Speedup"] = display_df["Speedup"].apply(lambda x: f"{x:.1f}x")
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             
             # RAPIDS architecture explainer

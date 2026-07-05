@@ -16,6 +16,7 @@
 **Problem Statement:** Accelerated Data Intelligence Challenge
 
 ### The 5-Point Checklist
+
 | # | Requirement | D.A.M.I. |
 |---|---|---|
 | 1 | **Real User** | Cloud Migration Architect / IT Infrastructure Director |
@@ -25,6 +26,7 @@
 | 5 | **Acceleration Proof** | NVIDIA RAPIDS cuDF **28.7x GPU speedup** + AI pipeline **500x faster** than manual |
 
 ### Technologies Used (6+)
+
 | Technology | Category | Usage |
 |---|---|---|
 | **BigQuery** | Data Warehouse | 17-table migration schema + BQML logistic regression risk model |
@@ -43,6 +45,7 @@
 ## 🎯 The Problem
 
 Enterprise VMware-to-cloud migrations are slow, expensive, and manual:
+
 - Analyzing thousands of VMs takes **6-18 months** of consulting at **$300/hr**
 - Circular dependency loops block migration wave scheduling
 - Licensing risks (Oracle DBMS on shared compute) cause **$500K+ overruns**
@@ -55,6 +58,7 @@ D.A.M.I. is an **Accelerated Data Intelligence Tool** that helps Cloud Migration
 > *"D.A.M.I. helps a Cloud Migration Architect decide how to sequence and execute datacenter-to-cloud migration using VM inventory data by producing risk-scored wave plans, target architecture recommendations, and IaC templates — all accelerated by NVIDIA RAPIDS cuDF."*
 
 ### Acceleration Impact
+
 | Metric | Traditional | D.A.M.I. | Improvement |
 |---|---|---|---|
 | **Time-to-Decision** | 6-18 months | ~8 minutes | **500x faster** |
@@ -118,7 +122,9 @@ D.A.M.I. is an **Accelerated Data Intelligence Tool** that helps Cloud Migration
 | **OPTIMIZE** | Feedback Agent | ⚡ gemini-2.5-flash | Human corrections → self-learning memory loop |
 
 ### Intelligent LLM Routing
+
 D.A.M.I. automatically routes queries to the optimal Gemini model:
+
 - **⚡ Flash** — Data lookups, SQL generation, quick responses (sub-second)
 - **🧠 Pro** — Architecture design, IaC generation, complex reasoning
 
@@ -175,7 +181,7 @@ D.A.M.I. uses **Gemini Vision** to extract infrastructure components from upload
 
 ---
 
-## 🎯 Quick Demo (for Judges)
+## 🎯 Quick Demo
 
 > Follow these 5 steps to see D.A.M.I. in action:
 
@@ -194,12 +200,14 @@ D.A.M.I. uses **Gemini Vision** to extract infrastructure components from upload
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
 - Google Cloud project with BigQuery & Vertex AI enabled
 - NVIDIA GPU with CUDA support (for RAPIDS cuDF acceleration)
 - `gcloud` CLI authenticated (`gcloud auth application-default login`)
 
 ### Local Development
+
 ```bash
 # Clone
 git clone https://github.com/dheerajyadav1714/dami-migration.git
@@ -225,6 +233,7 @@ streamlit run ui/app.py
 ```
 
 ### Deploy to Cloud Run
+
 ```bash
 gcloud run deploy dami-app \
   --source . \
@@ -238,6 +247,7 @@ gcloud run deploy dami-app \
 ---
 
 ## 📁 Project Structure
+
 ```
 dami-migration/
 ├── agents/                    # 8 ADK specialist agents
@@ -267,13 +277,6 @@ dami-migration/
 
 ---
 
-## 👤 Team
-
-| Name | Role |
-|---|---|
-| **Dheeraj Yadav** | Full-stack developer — agents, UI, deployment |
-
----
-
 ## 📄 License
+
 Built for the Google Cloud & NVIDIA Gen AI Hackathon 2026 — APAC Edition (Cohort 2).

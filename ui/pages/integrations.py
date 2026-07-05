@@ -2,19 +2,20 @@
 import streamlit as st
 import os
 import time
+import agents.vault_manager as vault
 
 def render():
     st.markdown("<h1 class='gradient-text'>DevOps & Tool Integrations</h1>", unsafe_allow_html=True)
     st.write("Securely connect D.A.M.I. to your DevOps toolchain to synchronize migration milestones, push generated templates, and publish cutover runbooks.")
     st.write("---")
     
-    # Initialize session states for mock connection states
+    # Initialize connection states based on secure vault contents
     if "jira_conn" not in st.session_state:
-        st.session_state.jira_conn = False
+        st.session_state.jira_conn = vault.get_secret("jira_token") is not None
     if "github_conn" not in st.session_state:
-        st.session_state.github_conn = False
+        st.session_state.github_conn = vault.get_secret("github_token") is not None
     if "confluence_conn" not in st.session_state:
-        st.session_state.confluence_conn = False
+        st.session_state.confluence_conn = vault.get_secret("confluence_token") is not None
         
     col1, col2, col3 = st.columns(3)
     
@@ -32,6 +33,8 @@ def render():
                 if jira_domain and jira_project and jira_token:
                     with st.spinner("Establishing Jira OAuth secure connection..."):
                         time.sleep(1.5)
+                    vault.save_secret("jira_token", jira_token)
+                    st.session_state.jira_proj = jira_project
                     st.session_state.jira_conn = True
                     st.success("Successfully connected to Jira Project!")
                     st.rerun()
@@ -47,6 +50,7 @@ def render():
                 st.success("Jira board updated! Created 5 Epics and 100 workload migration sub-tasks successfully.")
                 
             if st.button("🔌 Disconnect Jira", use_container_width=True):
+                vault.delete_secret("jira_token")
                 st.session_state.jira_conn = False
                 st.rerun()
                 
@@ -64,6 +68,8 @@ def render():
                 if github_repo and github_branch and github_token:
                     with st.spinner("Authorizing GitHub credentials..."):
                         time.sleep(1.5)
+                    vault.save_secret("github_token", github_token)
+                    st.session_state.gh_branch = github_branch
                     st.session_state.github_conn = True
                     st.success("Connected to repository branch!")
                     st.rerun()
@@ -79,6 +85,7 @@ def render():
                 st.success("IaC pushed! Committed generated Terraform templates and Ansible playbooks under commit ID 'dami-auto-iac-wave-0'.")
                 
             if st.button("🔌 Disconnect GitHub", use_container_width=True):
+                vault.delete_secret("github_token")
                 st.session_state.github_conn = False
                 st.rerun()
                 
@@ -96,6 +103,8 @@ def render():
                 if conf_domain and conf_space and conf_token:
                     with st.spinner("Connecting to Confluence Wiki space..."):
                         time.sleep(1.5)
+                    vault.save_secret("confluence_token", conf_token)
+                    st.session_state.conf_space = conf_space
                     st.session_state.confluence_conn = True
                     st.success("Connected to wiki space successfully!")
                     st.rerun()
@@ -111,12 +120,33 @@ def render():
                 st.success("Published runbook wiki space! Document: 'DAMI-Wave-0-Cutover-Runbook' is active.")
                 
             if st.button("🔌 Disconnect Confluence", use_container_width=True):
+                vault.delete_secret("confluence_token")
                 st.session_state.confluence_conn = False
                 st.rerun()
 
     st.write("---")
+    
+    # Fetch active secret metadata
+    active_secrets = []
+    if vault.get_secret_metadata("jira_token"): active_secrets.append("jira_token")
+    if vault.get_secret_metadata("github_token"): active_secrets.append("github_token")
+    if vault.get_secret_metadata("confluence_token"): active_secrets.append("confluence_token")
+    
+    active_secrets_html = ""
+    if active_secrets:
+        active_secrets_html = "<div style='margin-top: 14px; border-top: 1px solid rgba(16, 185, 129, 0.15); padding-top: 14px;'><div style='color: #6b7280; font-size: 0.7rem; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.05em;'>ENCRYPTED SECRETS IN SECRET MANAGER VAULT:</div>"
+        for s_id in active_secrets:
+            meta = vault.get_secret_metadata(s_id)
+            active_secrets_html += f"""
+                <div style="background-color: rgba(0, 0, 0, 0.15); padding: 8px 12px; border-radius: 4px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255, 255, 255, 0.02);">
+                    <span style="color: #ffffff; font-family: monospace; font-size: 0.8rem; font-weight: 500;">🔑 {s_id}</span>
+                    <span style="color: #a3a8b4; font-size: 0.72rem; font-family: monospace;">Ciphertext size: {meta['ciphertext_len']} bytes | Nonce: {meta['nonce'][:12]}...</span>
+                </div>
+            """
+        active_secrets_html += "</div>"
+    
     # Premium Secure Vault Card Styling
-    st.markdown("""
+    st.markdown(f"""
         <div style="background-color: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 8px; padding: 20px; margin-top: 10px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin: 0; color: #10b981; font-family: 'Outfit', 'Inter', sans-serif; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
@@ -140,13 +170,14 @@ def render():
                     <div style="color: #10b981; font-family: monospace; word-break: break-all; font-weight: 600;">dami-migration-runner@cohort-2-497207.iam.gserviceaccount.com</div>
                 </div>
             </div>
+            {active_secrets_html}
         </div>
         <style>
-            @keyframes pulse-green {
-                0% { opacity: 0.3; transform: scale(0.95); }
-                50% { opacity: 1; transform: scale(1.05); }
-                100% { opacity: 0.3; transform: scale(0.95); }
-            }
+            @keyframes pulse-green {{
+                0% {{ opacity: 0.3; transform: scale(0.95); }}
+                50% {{ opacity: 1; transform: scale(1.05); }}
+                100% {{ opacity: 0.3; transform: scale(0.95); }}
+            }}
         </style>
     """, unsafe_allow_html=True)
 

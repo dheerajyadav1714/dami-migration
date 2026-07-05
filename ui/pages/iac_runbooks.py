@@ -21,9 +21,10 @@ def get_waves_list(client, project_id, dataset):
         print(f"Failed to query waves: {e}")
     return pd.DataFrame()
 
-def read_local_file(wave_number, file_type):
+def read_local_file(wave_number, file_type, target_cloud="Google Cloud Platform (GCP)"):
+    cloud_suffix = "_aws" if "AWS" in target_cloud else "_azure" if "Azure" in target_cloud else "_gcp"
     mapping = {
-        'tf': f"wave_{wave_number}_infra.tf",
+        'tf': f"wave_{wave_number}_infra{cloud_suffix}.tf",
         'k8s': f"wave_{wave_number}_k8s.yaml",
         'ansible': f"wave_{wave_number}_ansible.yaml",
         'runbook': f"wave_{wave_number}_runbook.md"
@@ -73,7 +74,7 @@ def read_local_file(wave_number, file_type):
             query = f"""
                 SELECT content_preview 
                 FROM `{project_id}.{dataset}.iac_artifacts` 
-                WHERE wave_id = '{wave_id}' AND artifact_type = '{bq_artifact_type}'
+                WHERE wave_id = '{wave_id}' AND file_name = '{file_name}'
                 LIMIT 1
             """
             df = client.query(query).to_dataframe()
@@ -103,26 +104,35 @@ def render():
     wave_id = "wav-0000"
     wave_name = "Pilot Wave"
     
-    if not df_waves.empty:
-        wave_options = [f"Wave {row['wave_number']}: {row['wave_name']}" for _, row in df_waves.iterrows()]
-        selected_option = st.selectbox("Select Target Wave Group", wave_options)
-        selected_row = df_waves.iloc[wave_options.index(selected_option)]
-        wave_num = int(selected_row["wave_number"])
-        wave_id = selected_row["wave_id"]
-        wave_name = selected_row["wave_name"]
-    else:
-        st.selectbox("Select Target Wave Group", ["Wave 0: Pilot Wave"])
-        st.info("No live waves found in BigQuery database. Showing default Wave 0 mock values. Generate waves on Wave Plan page.")
+    sel_col1, sel_col2 = st.columns([2, 1])
+    with sel_col1:
+        if not df_waves.empty:
+            wave_options = [f"Wave {row['wave_number']}: {row['wave_name']}" for _, row in df_waves.iterrows()]
+            selected_option = st.selectbox("Select Target Wave Group", wave_options)
+            selected_row = df_waves.iloc[wave_options.index(selected_option)]
+            wave_num = int(selected_row["wave_number"])
+            wave_id = selected_row["wave_id"]
+            wave_name = selected_row["wave_name"]
+        else:
+            st.selectbox("Select Target Wave Group", ["Wave 0: Pilot Wave"])
+            st.info("No live waves found in BigQuery database. Showing default Wave 0 mock values. Generate waves on Wave Plan page.")
+            
+    with sel_col2:
+        target_cloud = st.selectbox("Select Target Cloud Provider", [
+            "Google Cloud Platform (GCP)",
+            "Amazon Web Services (AWS)",
+            "Microsoft Azure"
+        ])
         
     with col2:
         st.write(" ")
         st.write(" ")
         if st.button("⚙️ Generate Wave Artifacts", use_container_width=True):
-            with st.spinner(f"Gemini generating IaC and Runbooks for Wave {wave_num}..."):
+            with st.spinner(f"Gemini generating IaC and Runbooks for Wave {wave_num} on {target_cloud}..."):
                 from agents.artifacts_generator import ArtifactsGeneratorAgent
                 generator = ArtifactsGeneratorAgent()
                 try:
-                    res = generator.generate_wave_artifacts(wave_num)
+                    res = generator.generate_wave_artifacts(wave_num, target_cloud)
                     st.success(f"Success! Generated Wave {wave_num} deployment artifacts.")
                     st.rerun()
                 except Exception as e:
@@ -133,9 +143,15 @@ def render():
     # ── Horizontal Metadata Bar ──
     meta_col1, meta_col2, meta_col3, meta_col4 = st.columns(4)
     with meta_col1:
-        st.markdown("<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Target Cloud</p><span class='status-badge status-info' style='display:inline-block; font-weight: 500;'>Google Cloud Platform ☁️</span>", unsafe_allow_html=True)
+        if "AWS" in target_cloud:
+            cloud_badge = "<span class='status-badge' style='display:inline-block; font-weight: 500; background-color: #ff9900; color: #111111;'>Amazon Web Services ☁️</span>"
+        elif "Azure" in target_cloud:
+            cloud_badge = "<span class='status-badge' style='display:inline-block; font-weight: 500; background-color: #0078d4; color: #ffffff;'>Microsoft Azure ☁️</span>"
+        else:
+            cloud_badge = "<span class='status-badge status-info' style='display:inline-block; font-weight: 500;'>Google Cloud Platform ☁️</span>"
+        st.markdown(f"<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Target Cloud</p>{cloud_badge}", unsafe_allow_html=True)
     with meta_col2:
-        st.markdown("<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Generation Engine</p><span class='status-badge status-success' style='display:inline-block; font-weight: 500;'>Gemini 2.5 Flash 🤖</span>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Generation Engine</p><span class='status-badge' style='display:inline-block; font-weight: 500; background-color: #6a1b9a; color: #ffffff;'>Gemini 2.5 Pro 🤖</span>", unsafe_allow_html=True)
     with meta_col3:
         gcs_bucket = os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')
         st.markdown(f"<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Artifacts GCS Target</p><code style='font-size:0.8rem; word-break: break-all;'>gs://{gcs_bucket}/iac-artifacts/wave_{wave_num}/</code>", unsafe_allow_html=True)
@@ -145,10 +161,10 @@ def render():
     st.write("---")
     
     # Check if files are generated
-    tf_code = read_local_file(wave_num, "tf")
-    k8s_code = read_local_file(wave_num, "k8s")
-    ansible_code = read_local_file(wave_num, "ansible")
-    runbook_md = read_local_file(wave_num, "runbook")
+    tf_code = read_local_file(wave_num, "tf", target_cloud)
+    k8s_code = read_local_file(wave_num, "k8s", target_cloud)
+    ansible_code = read_local_file(wave_num, "ansible", target_cloud)
+    runbook_md = read_local_file(wave_num, "runbook", target_cloud)
     
     # If no files generated yet, fallback to default mocks for illustration
     if not tf_code:
@@ -220,9 +236,9 @@ resource "google_compute_instance" "dev_test_vm_01" {
             k8s_code = ""
             runbook_md = "### Runbook for this wave is pending. Click 'Generate Wave Artifacts' above."
 
-    tab_runbook, tab_tf, tab_k8s, tab_cicd, tab_ansible, tab_docker, tab_monitoring = st.tabs([
-        "📖 Runbook", "🚀 Terraform HCL", "☸️ Kubernetes YAML", 
-        "🔄 CI/CD Pipeline", "🤖 Ansible Playbook", "🐳 Dockerfile", "📊 Monitoring"
+    tab_runbook, tab_tf, tab_docker, tab_k8s, tab_ansible, tab_cicd, tab_monitoring = st.tabs([
+        "📖 Runbook", "🚀 Terraform HCL", "🐳 Dockerfile", "☸️ Kubernetes YAML", 
+        "🤖 Ansible Playbook", "🔄 CI/CD Pipeline", "📊 Monitoring"
     ])
     
     with tab_tf:

@@ -22,7 +22,7 @@ class ArtifactsGeneratorAgent:
         self.project_id = os.getenv("GCP_PROJECT_ID")
         self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
         self.location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-2.5-pro"
         
         # Check if GEMINI_API_KEY is available, otherwise use keyless Vertex AI
         api_key = os.getenv("GEMINI_API_KEY")
@@ -34,12 +34,12 @@ class ArtifactsGeneratorAgent:
             self.use_vertex = True
             self.vertex_project = os.getenv("VERTEX_PROJECT_ID", "gcp-experiments-490315")
 
-    def generate_wave_artifacts(self, wave_number: int) -> dict:
+    def generate_wave_artifacts(self, wave_number: int, target_cloud: str = "Google Cloud Platform (GCP)") -> dict:
         """
         Reads target architecture mapping and sequence details from BigQuery,
         generates IaC configurations and Runbooks using Gemini, and saves results.
         """
-        print(f"Starting IaC & Runbook generation for Wave {wave_number}...")
+        print(f"Starting IaC & Runbook generation for Wave {wave_number} on {target_cloud}...")
         client = bigquery.Client(project=self.project_id)
         
         # 1. Fetch wave metadata
@@ -104,8 +104,17 @@ class ArtifactsGeneratorAgent:
             "You MUST output valid, clean code strings inside the requested JSON structure."
         )
         
+        cloud_req = ""
+        if "AWS" in target_cloud:
+            cloud_req = "Generate AWS Terraform configurations (e.g., aws_instance, aws_db_instance, aws_vpc, aws_subnet, aws_eks_cluster, aws_security_group) mapping to these workloads. Use official AWS provider blocks."
+        elif "Azure" in target_cloud:
+            cloud_req = "Generate Microsoft Azure Terraform configurations (e.g., azurerm_virtual_machine, azurerm_mssql_server, azurerm_virtual_network, azurerm_subnet, azurerm_kubernetes_cluster, azurerm_resource_group) mapping to these workloads. Use official AzureRM provider blocks."
+        else:
+            cloud_req = "Generate Google Cloud Platform (GCP) Terraform configurations (e.g., google_compute_instance, google_sql_database_instance, google_container_cluster, google_compute_network) mapping to these workloads. Use official Google provider blocks."
+
         prompt = f"""
         Generate migration execution artifacts for Wave {wave_number}: "{wave_name}".
+        Target Cloud Provider: {target_cloud}
         
         ### Wave Metadata
         - Wave ID: {wave_id}
@@ -118,7 +127,7 @@ class ArtifactsGeneratorAgent:
         {json.dumps(workloads_list, indent=2)}
         
         ### Requirements
-        1. **Terraform HCL**: Provide the actual Terraform HCL resources required to provision these workloads. Include provider definitions, variables, and network resources as appropriate (e.g. `google_compute_instance`, `google_sql_database_instance`, or `google_container_cluster`).
+        1. **Terraform HCL**: Provide the actual Terraform HCL resources required to provision these workloads on the target cloud. {cloud_req} Ensure variable definitions, variables blocks, and provider blocks are completely written. Do not use placeholders.
         2. **Kubernetes YAML**: Only if GKE is one of the target services ({has_gke}), provide a complete Deployment and Service manifest matching the rightsized cpu/memory request limits. Otherwise, return empty.
         3. **Ansible Playbook**: Only if Compute Engine is one of the target services ({has_gce}), provide an Ansible Playbook configuration yaml to configure packages, copy application scripts, and manage systemd services on the VMs. Otherwise, return empty.
         4. **Markdown Runbook**: Create a step-by-step markdown cutover runbook. Include pre-migration checks, server shut-down sequencing, data synchronization verification, post-migration sanity tests, and explicit step-by-step rollback procedures.
@@ -143,6 +152,10 @@ class ArtifactsGeneratorAgent:
         
         result_json = json.loads(response.text)
         
+        # Determine cloud suffix for file naming
+        cloud_suffix = "_aws" if "AWS" in target_cloud else "_azure" if "Azure" in target_cloud else "_gcp"
+        tf_filename = f"wave_{wave_number}_infra{cloud_suffix}.tf"
+        
         # 6. Save results to BigQuery
         # Insert Terraform HCL
         tf_hcl = result_json.get("terraform_hcl", "")
@@ -153,8 +166,8 @@ class ArtifactsGeneratorAgent:
                 "artifact_id": f"art-tf-{wave_number}",
                 "wave_id": wave_id,
                 "artifact_type": "terraform",
-                "file_name": f"wave_{wave_number}_infra.tf",
-                "gcs_path": f"gs://{os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')}/iac-artifacts/wave_{wave_number}/wave_{wave_number}_infra.tf",
+                "file_name": tf_filename,
+                "gcs_path": f"gs://{os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')}/iac-artifacts/wave_{wave_number}/{tf_filename}",
                 "content_preview": tf_hcl[:450],
                 "resource_count": len(workloads_list),
                 "validated": True,
@@ -275,7 +288,7 @@ class ArtifactsGeneratorAgent:
         os.makedirs(asset_dir, exist_ok=True)
         
         if tf_hcl:
-            with open(f"{asset_dir}/wave_{wave_number}_infra.tf", "w", encoding="utf-8") as f:
+            with open(f"{asset_dir}/{tf_filename}", "w", encoding="utf-8") as f:
                 f.write(tf_hcl)
         if k8s_yaml:
             with open(f"{asset_dir}/wave_{wave_number}_k8s.yaml", "w", encoding="utf-8") as f:
@@ -295,7 +308,7 @@ class ArtifactsGeneratorAgent:
             bucket = gcs_client.bucket(gcs_bucket_name)
             
             artifact_files = {
-                f"wave_{wave_number}/wave_{wave_number}_infra.tf": tf_hcl,
+                f"wave_{wave_number}/{tf_filename}": tf_hcl,
                 f"wave_{wave_number}/wave_{wave_number}_k8s.yaml": k8s_yaml,
                 f"wave_{wave_number}/wave_{wave_number}_ansible.yaml": ansible_yaml,
                 f"wave_{wave_number}/wave_{wave_number}_runbook.md": runbook_md,

@@ -30,16 +30,16 @@ def render():
             jira_token = st.text_input("API Token", type="password", placeholder="Enter Jira API Token", key="jira_tok")
             
             if st.button("🔌 Connect Jira", use_container_width=True):
-                if jira_domain and jira_project and jira_token:
-                    with st.spinner("Establishing Jira OAuth secure connection..."):
-                        time.sleep(1.5)
-                    vault.save_secret("jira_token", jira_token)
-                    st.session_state.jira_proj = jira_project
-                    st.session_state.jira_conn = True
-                    st.success("Successfully connected to Jira Project!")
-                    st.rerun()
-                else:
-                    st.warning("Please fill in all fields.")
+                dom = jira_domain if jira_domain else "acme.atlassian.net"
+                proj = jira_project if jira_project else "MIG"
+                tok = jira_token if jira_token else "jira-token-secure-123"
+                with st.spinner("Establishing Jira OAuth secure connection..."):
+                    time.sleep(1.5)
+                vault.save_secret("jira_token", tok)
+                st.session_state.jira_proj = proj
+                st.session_state.jira_conn = True
+                st.success("Successfully connected to Jira Project!")
+                st.rerun()
         else:
             st.markdown("<span class='status-badge status-success'>Connected</span>", unsafe_allow_html=True)
             st.info(f"Target Project Key: **{st.session_state.get('jira_proj', 'MIG')}**")
@@ -65,16 +65,16 @@ def render():
             github_token = st.text_input("Access Token (PAT)", type="password", placeholder="Enter GitHub Personal Token", key="gh_tok")
             
             if st.button("🔌 Connect GitHub", use_container_width=True):
-                if github_repo and github_branch and github_token:
-                    with st.spinner("Authorizing GitHub credentials..."):
-                        time.sleep(1.5)
-                    vault.save_secret("github_token", github_token)
-                    st.session_state.gh_branch = github_branch
-                    st.session_state.github_conn = True
-                    st.success("Connected to repository branch!")
-                    st.rerun()
-                else:
-                    st.warning("Please fill in all fields.")
+                repo = github_repo if github_repo else "org/migration-iac"
+                branch = github_branch if github_branch else "main"
+                tok = github_token if github_token else "github-pat-secure-456"
+                with st.spinner("Authorizing GitHub credentials..."):
+                    time.sleep(1.5)
+                vault.save_secret("github_token", tok)
+                st.session_state.gh_branch = branch
+                st.session_state.github_conn = True
+                st.success("Connected to repository branch!")
+                st.rerun()
         else:
             st.markdown("<span class='status-badge status-success'>Connected</span>", unsafe_allow_html=True)
             st.info(f"Target Branch: **{st.session_state.get('gh_branch', 'main')}**")
@@ -100,16 +100,16 @@ def render():
             conf_token = st.text_input("API Token", type="password", placeholder="Enter Confluence API Token", key="conf_tok")
             
             if st.button("🔌 Connect Confluence", use_container_width=True):
-                if conf_domain and conf_space and conf_token:
-                    with st.spinner("Connecting to Confluence Wiki space..."):
-                        time.sleep(1.5)
-                    vault.save_secret("confluence_token", conf_token)
-                    st.session_state.conf_space = conf_space
-                    st.session_state.confluence_conn = True
-                    st.success("Connected to wiki space successfully!")
-                    st.rerun()
-                else:
-                    st.warning("Please fill in all fields.")
+                dom = conf_domain if conf_domain else "acme.atlassian.net/wiki"
+                space = conf_space if conf_space else "MIGDOCS"
+                tok = conf_token if conf_token else "confluence-api-token-789"
+                with st.spinner("Connecting to Confluence Wiki space..."):
+                    time.sleep(1.5)
+                vault.save_secret("confluence_token", tok)
+                st.session_state.conf_space = space
+                st.session_state.confluence_conn = True
+                st.success("Connected to wiki space successfully!")
+                st.rerun()
         else:
             st.markdown("<span class='status-badge status-success'>Connected</span>", unsafe_allow_html=True)
             st.info(f"Wiki Space Key: **{st.session_state.get('conf_space', 'MIGDOCS')}**")

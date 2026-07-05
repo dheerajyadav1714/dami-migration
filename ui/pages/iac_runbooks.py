@@ -55,7 +55,9 @@ def read_local_file(wave_number, file_type):
             """
             df = client.query(query).to_dataframe()
             if not df.empty and df.iloc[0]["content_preview"]:
-                return df.iloc[0]["content_preview"]
+                content = df.iloc[0]["content_preview"]
+                # Replace literal \n and \t string escapes with actual formatting control characters
+                return content.replace('\\n', '\n').replace('\\t', '\t')
         except Exception as e:
             print(f"BQ artifact fallback failed: {e}")
     

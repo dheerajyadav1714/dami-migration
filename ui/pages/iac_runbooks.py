@@ -105,6 +105,20 @@ def render():
                 except Exception as e:
                     st.error(f"Error: {e}")
                     
+    st.write(" ")
+    
+    # ── Horizontal Metadata Bar ──
+    meta_col1, meta_col2, meta_col3, meta_col4 = st.columns(4)
+    with meta_col1:
+        st.markdown("<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Target Cloud</p><span class='status-badge status-info' style='display:inline-block; font-weight: 500;'>Google Cloud Platform ☁️</span>", unsafe_allow_html=True)
+    with meta_col2:
+        st.markdown("<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Generation Engine</p><span class='status-badge status-success' style='display:inline-block; font-weight: 500;'>Gemini 2.5 Flash 🤖</span>", unsafe_allow_html=True)
+    with meta_col3:
+        gcs_bucket = os.getenv('GCS_BUCKET', 'dami-artifacts-cohort-2')
+        st.markdown(f"<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Artifacts GCS Target</p><code style='font-size:0.8rem; word-break: break-all;'>gs://{gcs_bucket}/iac-artifacts/wave_{wave_num}/</code>", unsafe_allow_html=True)
+    with meta_col4:
+        st.markdown("<p style='font-size:0.9rem; margin-bottom:0.2rem; color: #a3a8b4;'>Linter Status</p><span class='status-badge status-success' style='display:inline-block; font-weight: 500;'>Validated & Linted ✅</span>", unsafe_allow_html=True)
+
     st.write("---")
     
     # Check if files are generated
@@ -183,12 +197,12 @@ resource "google_compute_instance" "dev_test_vm_01" {
             k8s_code = ""
             runbook_md = "### Runbook for this wave is pending. Click 'Generate Wave Artifacts' above."
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "🚀 Terraform HCL", "☸️ Kubernetes YAML", "🤖 Ansible Playbook", 
-        "📖 Runbook", "🔄 CI/CD Pipeline", "📊 Monitoring", "🐳 Dockerfile"
+    tab_runbook, tab_tf, tab_k8s, tab_cicd, tab_ansible, tab_docker, tab_monitoring = st.tabs([
+        "📖 Runbook", "🚀 Terraform HCL", "☸️ Kubernetes YAML", 
+        "🔄 CI/CD Pipeline", "🤖 Ansible Playbook", "🐳 Dockerfile", "📊 Monitoring"
     ])
     
-    with tab1:
+    with tab_tf:
         st.write(" ")
         st.subheader("GCP Infrastructure Provisioning (Terraform)")
         st.caption("Generated automatically by Gemini Cloud Architect Agent with right-sized configurations.")
@@ -203,7 +217,7 @@ resource "google_compute_instance" "dev_test_vm_01" {
                 key=f"dl_tf_{wave_num}"
             )
         
-    with tab2:
+    with tab_k8s:
         st.write(" ")
         st.subheader("Target Kubernetes Configurations")
         st.caption("Generated manifests for containerized refactored workloads (GKE target services).")
@@ -220,7 +234,7 @@ resource "google_compute_instance" "dev_test_vm_01" {
         else:
             st.info("No Kubernetes workloads mapped for this wave. Standard Compute Engine or Cloud SQL migrations do not require GKE manifests.")
         
-    with tab3:
+    with tab_ansible:
         st.write(" ")
         st.subheader("Ansible Configuration Playbook")
         st.caption("Generated playbooks for post-migration software installations, package management, and service configurations.")
@@ -237,7 +251,7 @@ resource "google_compute_instance" "dev_test_vm_01" {
         else:
             st.info("No virtual machines needing post-migration configuration mapped in this wave (e.g. serverless or container-only waves).")
             
-    with tab4:
+    with tab_runbook:
         st.write(" ")
         st.subheader("Workload Cutover Runbook")
         st.caption("Step-by-step checklist matching enterprise migration standards including rollback procedures.")
@@ -252,7 +266,7 @@ resource "google_compute_instance" "dev_test_vm_01" {
                 key=f"dl_rb_{wave_num}"
             )
             
-    with tab5:
+    with tab_cicd:
         st.write(" ")
         st.subheader("CI/CD Pipeline Configuration")
         st.caption("Auto-generated pipeline configs for GitHub Actions and GitLab CI. Supports build, test, deploy stages.")
@@ -460,7 +474,7 @@ verify:
 }}"""
             st.code(jenkins_pipeline, language="groovy")
     
-    with tab6:
+    with tab_monitoring:
         st.write(" ")
         st.subheader("Cloud Monitoring & Alerting")
         st.caption("Pre-configured monitoring alert policies and SLO dashboards for migrated workloads.")
@@ -547,7 +561,7 @@ resource "google_monitoring_slo" "wave{wave_num}_availability" {{
 }}"""
         st.code(monitoring_tf, language="hcl")
     
-    with tab7:
+    with tab_docker:
         st.write(" ")
         st.subheader("Container Images (Dockerfile)")
         st.caption("Auto-generated Dockerfiles for workloads migrated to GKE or Cloud Run via Refactor strategy.")

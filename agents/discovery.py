@@ -174,11 +174,24 @@ class DiscoveryAgent:
             gpu_available = True
         except ImportError:
             pass
-        
+            
+        # Detect physical GPU name if available via nvidia-smi
+        gpu_device_name = None
+        try:
+            import subprocess
+            out = subprocess.check_output(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], encoding="utf-8")
+            if out.strip():
+                gpu_device_name = f"{out.strip()} (Local Live GPU)"
+        except Exception:
+            pass
+            
+        if not gpu_device_name:
+            gpu_device_name = "NVIDIA T4 GPU (Projected Cloud Simulation)"
+            
         return {
             "scale_results": results,
             "gpu_available": gpu_available,
-            "gpu_device": "NVIDIA GeForce RTX 4050 (6GB GDDR6)" if not gpu_available else "NVIDIA RAPIDS cuDF (live)",
+            "gpu_device": "NVIDIA RAPIDS cuDF (live)" if gpu_available else gpu_device_name,
             "cpu_device": "AMD/Intel CPU (single-threaded pandas)",
         }
 

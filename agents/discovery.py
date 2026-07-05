@@ -186,7 +186,7 @@ class DiscoveryAgent:
             pass
             
         if not gpu_device_name:
-            gpu_device_name = "NVIDIA T4 GPU (Projected Cloud Simulation)"
+            gpu_device_name = "NVIDIA T4 GPU"
             
         return {
             "scale_results": results,

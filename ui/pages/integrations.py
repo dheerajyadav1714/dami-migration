@@ -21,12 +21,12 @@ def render():
     
     # Jira Card
     with col1:
-        st.subheader("🤖 Jira Project Management")
+        st.subheader("🎯 Jira Project Management")
         st.caption("Synchronize migration waves and cutover checklists into project tasks.")
         
         if not st.session_state.jira_conn:
             jira_domain = st.text_input("Jira Domain", placeholder="company.atlassian.net", key="jira_dom")
-            jira_project = st.text_input("Project Key", placeholder="MIG", key="jira_proj")
+            jira_project = st.text_input("Project Key", placeholder="MIG", key="jira_proj_input")
             jira_token = st.text_input("API Token", type="password", placeholder="Enter Jira API Token", key="jira_tok")
             
             if st.button("🔌 Connect Jira", use_container_width=True):
@@ -61,7 +61,7 @@ def render():
         
         if not st.session_state.github_conn:
             github_repo = st.text_input("GitHub Repository", placeholder="org/migration-iac", key="gh_repo")
-            github_branch = st.text_input("Target Branch", placeholder="main", key="gh_branch")
+            github_branch = st.text_input("Target Branch", placeholder="main", key="gh_branch_input")
             github_token = st.text_input("Access Token (PAT)", type="password", placeholder="Enter GitHub Personal Token", key="gh_tok")
             
             if st.button("🔌 Connect GitHub", use_container_width=True):
@@ -96,7 +96,7 @@ def render():
         
         if not st.session_state.confluence_conn:
             conf_domain = st.text_input("Confluence Domain", placeholder="company.atlassian.net/wiki", key="conf_dom")
-            conf_space = st.text_input("Space Key", placeholder="MIGDOCS", key="conf_space")
+            conf_space = st.text_input("Space Key", placeholder="MIGDOCS", key="conf_space_input")
             conf_token = st.text_input("API Token", type="password", placeholder="Enter Confluence API Token", key="conf_tok")
             
             if st.button("🔌 Connect Confluence", use_container_width=True):

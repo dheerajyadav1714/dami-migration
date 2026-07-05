@@ -7,6 +7,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.58-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![Google Cloud](https://img.shields.io/badge/Google_Cloud-BigQuery_|_Vertex_AI_|_Cloud_Run-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](https://cloud.google.com)
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-RAPIDS_cuDF-76B900?style=flat-square&logo=nvidia&logoColor=white)](https://rapids.ai)
+[![Looker](https://img.shields.io/badge/Looker_Studio-Live_KPIs-4285F4?style=flat-square&logo=google&logoColor=white)](https://lookerstudio.google.com)
 
 ---
 
@@ -145,6 +146,10 @@ D.A.M.I. automatically routes queries to the optimal Gemini model:
 
 **Hardware:** NVIDIA GeForce RTX 4050 Laptop GPU (6GB GDDR6)
 
+*Note: Pandas variance at small sizes reflects Python interpreter overhead. cuDF variance at 25K-50K reflects CUDA memory transfer costs before GPU cores fully saturate at 100K rows.*
+
+> **Note:** Benchmarks captured on RTX 4050 (6GB, local dev environment). Cloud Run deployment uses `cudf.pandas` CPU-compatible fallback — same API, zero code changes. Production path: GKE + NVIDIA T4/L4 GPU node pool for full GPU acceleration.
+
 ---
 
 ## 📊 Key Features (14 Pages)
@@ -152,6 +157,7 @@ D.A.M.I. automatically routes queries to the optimal Gemini model:
 | Feature | Description |
 |---|---|
 | **📊 Executive Dashboard** | KPI grid, readiness gauge, acceleration impact, progress timeline |
+| **📈 Looker Dashboard** | Executive migration KPIs — risk distribution, TCO comparison, wave progress (embedded live BigQuery data) |
 | **📥 Ingestion Center** | Multi-format upload to GCS + RAPIDS cuDF CPU vs GPU benchmark |
 | **🖥️ Server Inventory** | Live BigQuery data explorer with filtering |
 | **🌐 Dependency Map** | Interactive PyVis + Graphviz + circular loop detection |

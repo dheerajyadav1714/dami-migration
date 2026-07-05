@@ -344,6 +344,9 @@ class RiskScorerAgent:
             query_job.result()  # Wait for training to complete
             return "BQML Model 'migration_risk_model' trained successfully. ML.PREDICT will be used in future risk assessments."
         except Exception as e:
+            error_str = str(e)
+            if "concurrent model update" in error_str.lower() or "retrain" in error_str.lower():
+                return "A BQML training job is already active or finalizing in BigQuery. Please wait a moment and try again."
             return f"Failed to train BQML model: {e}"
     
     def evaluate_bqml_model(self) -> dict:

@@ -145,20 +145,20 @@ D.A.M.I. automatically routes queries to the optimal Gemini model:
 
 | Feature | Description |
 |---|---|
-| 🏠 **Mission Control Dashboard** | KPI grid, readiness gauge, acceleration impact, progress timeline |
-| 📤 **Upload & GPU Benchmark** | Multi-format upload to GCS + RAPIDS cuDF CPU vs GPU benchmark |
-| ⚡ **NVIDIA RAPIDS Benchmark** | Dedicated benchmark page with live GPU profiling |
-| 📋 **Server Inventory** | Live BigQuery data explorer with filtering |
-| 🔗 **Dependency Graph** | Interactive PyVis + Graphviz + circular loop detection |
-| ⚠️ **Risk & 7R Assessment** | BQML risk heatmap, strategy distribution, model training |
-| 🏗️ **Target Architecture** | AI-recommended GCP service mapping + multi-cloud topology with CIDR ranges |
-| 🌊 **Wave Gantt Chart** | AI-powered wave timeline with Gemini-generated rationale |
-| 💰 **TCO & FinOps** | What-If cost simulator with oversubscription sliders |
-| 💻 **IaC & Runbooks** | Terraform, K8s, Ansible, Dockerfile generation + rollback plans |
-| 🛡️ **Compliance** | HIPAA/PCI-DSS/SOC2/ISO27001 gap analysis + remediation |
-| 🔬 **Agent Observability** | Full execution trace timeline with Gantt visualization |
-| 💬 **Conversational AI** | NL → SQL → BigQuery with persistent chat + model routing badge |
-| 🧠 **Self-Learning** | BigQuery + AlloyDB pgvector agent memory feedback loops |
+| **📊 Executive Dashboard** | KPI grid, readiness gauge, acceleration impact, progress timeline |
+| **📥 Ingestion Center** | Multi-format upload to GCS + RAPIDS cuDF CPU vs GPU benchmark |
+| **🖥️ Server Inventory** | Live BigQuery data explorer with filtering |
+| **🌐 Dependency Map** | Interactive PyVis + Graphviz + circular loop detection |
+| **🛡️ Risk Assessment** | BQML risk heatmap, strategy distribution, model training |
+| **🏗️ Target Architecture** | AI-recommended GCP service mapping + multi-cloud topology with CIDR ranges |
+| **📅 Migration Wave Plan** | AI-powered wave timeline with Gemini-generated rationale |
+| **💵 FinOps & TCO** | What-If cost simulator with oversubscription sliders |
+| **⚙️ IaC & Runbooks** | Terraform, K8s, Ansible, Dockerfile generation + rollback plans |
+| **🔒 Compliance & Security** | HIPAA/PCI-DSS/SOC2/ISO27001 gap analysis + remediation |
+| **🔍 Agent Trace** | Full execution trace timeline with Gantt visualization |
+| **💬 Conversational Assistant** | NL → SQL → BigQuery with persistent chat + model routing badge |
+| **🔌 Integrations** | Jira, GitHub, Confluence sync center |
+| **🧠 Self-Learning** | BigQuery + AlloyDB pgvector agent memory feedback loops |
 
 ---
 
@@ -181,13 +181,13 @@ D.A.M.I. uses **Gemini Vision** to extract infrastructure components from upload
 
 | Step | Page | What You'll See |
 |---|---|---|
-| 1 | **Dashboard** | KPI grid, readiness gauge, acceleration impact (500x), NVIDIA benchmark |
-| 2 | **Upload Center** | Upload a CSV → GPU benchmark runs → data flows to BigQuery |
-| 3 | **Risk Assessment** | BQML risk heatmap + Gartner 7R strategy distribution |
-| 4 | **Target Architecture** | AI-recommended GCP services + multi-cloud topology with CIDR ranges |
-| 5 | **Chat** | Ask "How many high risk servers?" → NL→SQL→BigQuery in real-time |
+| 1 | **📊 Executive Dashboard** | KPI grid, readiness gauge, acceleration impact (500x), NVIDIA benchmark |
+| 2 | **📥 Ingestion Center** | Upload a CSV → GPU benchmark runs → data flows to BigQuery |
+| 3 | **🛡️ Risk Assessment** | BQML risk heatmap + Gartner 7R strategy distribution |
+| 4 | **🏗️ Target Architecture** | AI-recommended GCP services + multi-cloud topology with CIDR ranges |
+| 5 | **💬 Conversational Assistant** | Ask "How many high risk servers?" → NL→SQL→BigQuery in real-time |
 
-**Bonus pages:** Wave Gantt Chart (AI sequencing), IaC & Runbooks (Terraform generation), Compliance (HIPAA/PCI-DSS gap analysis)
+**Bonus pages:** 📅 Migration Wave Plan (AI sequencing), ⚙️ IaC & Runbooks (Terraform generation), 🔒 Compliance & Security (HIPAA/PCI-DSS gap analysis)
 
 ---
 

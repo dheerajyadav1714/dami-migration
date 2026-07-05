@@ -544,19 +544,19 @@ def render():
 
     # ── Migration Progress Timeline ──
     st.write("---")
-    st.subheader("📅 Migration Progress Timeline")
+    st.markdown("<h3><i class='bi bi-calendar3' style='color:#a78bfa; margin-right:8px;'></i> Migration Progress Timeline</h3>", unsafe_allow_html=True)
     
     # Calculate milestone completion from actual data
     milestones = [
-        {"Phase": "Discovery", "Icon": "🔍", "Status": "complete" if stats["total_servers"] > 0 else "pending"},
-        {"Phase": "Risk Assessment", "Icon": "⚠️", "Status": "complete" if stats["total_servers"] > 0 else "pending"},
-        {"Phase": "Dependency Mapping", "Icon": "🔗", "Status": "complete" if stats["total_servers"] > 0 else "pending"},
-        {"Phase": "Wave Planning", "Icon": "🌊", "Status": "complete" if stats["total_waves"] > 0 else "pending"},
-        {"Phase": "Architecture Design", "Icon": "🏗️", "Status": "complete" if stats["total_apps"] > 0 else "pending"},
-        {"Phase": "IaC Generation", "Icon": "📝", "Status": "in_progress"},
-        {"Phase": "Compliance Audit", "Icon": "🔒", "Status": "in_progress"},
-        {"Phase": "Migration Execution", "Icon": "🚀", "Status": "pending"},
-        {"Phase": "Validation & Cutover", "Icon": "✅", "Status": "pending"},
+        {"Phase": "Discovery", "Icon": "bi bi-search", "Status": "complete" if stats["total_servers"] > 0 else "pending"},
+        {"Phase": "Risk Assessment", "Icon": "bi bi-shield-slash", "Status": "complete" if stats["total_servers"] > 0 else "pending"},
+        {"Phase": "Dependency Mapping", "Icon": "bi bi-diagram-3", "Status": "complete" if stats["total_servers"] > 0 else "pending"},
+        {"Phase": "Wave Planning", "Icon": "bi bi-water", "Status": "complete" if stats["total_waves"] > 0 else "pending"},
+        {"Phase": "Architecture Design", "Icon": "bi bi-building-gear", "Status": "complete" if stats["total_apps"] > 0 else "pending"},
+        {"Phase": "IaC Generation", "Icon": "bi bi-code-square", "Status": "in_progress"},
+        {"Phase": "Compliance Audit", "Icon": "bi bi-shield-check", "Status": "in_progress"},
+        {"Phase": "Migration Execution", "Icon": "bi bi-rocket-takeoff", "Status": "pending"},
+        {"Phase": "Validation & Cutover", "Icon": "bi bi-check2-circle", "Status": "pending"},
     ]
     
     completed = sum(1 for m in milestones if m["Status"] == "complete")
@@ -564,31 +564,41 @@ def render():
     total = len(milestones)
     progress_pct = round((completed + in_progress * 0.5) / total * 100)
     
-    # Progress bar
-    st.progress(progress_pct / 100, text=f"Overall Progress: {progress_pct}% — {completed}/{total} phases complete")
+    # Spacious Progress bar layout
+    st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; margin-top: 10px;">
+            <span style="font-weight: 600; color: #a78bfa; font-size: 0.95rem;">Overall Progress</span>
+            <span style="font-weight: 700; color: #22d3ee; font-size: 0.95rem;">{progress_pct}% &mdash; {completed}/{total} phases complete</span>
+        </div>
+    """, unsafe_allow_html=True)
+    st.progress(progress_pct / 100)
+    st.write("")
     
     # Timeline visual
     cols = st.columns(len(milestones))
     for i, (col, m) in enumerate(zip(cols, milestones)):
         with col:
             if m["Status"] == "complete":
-                bg = "rgba(16, 185, 129, 0.15)"
+                bg = "rgba(16, 185, 129, 0.12)"
                 border = "#10b981"
-                badge = "✅"
+                icon_color = "#10b981"
+                badge = "<span style='color:#10b981; font-weight:700; font-size:0.75rem;'>Done</span>"
             elif m["Status"] == "in_progress":
-                bg = "rgba(99, 102, 241, 0.15)"
+                bg = "rgba(99, 102, 241, 0.12)"
                 border = "#6366f1"
-                badge = "🔄"
+                icon_color = "#8b5cf6"
+                badge = "<span style='color:#8b5cf6; font-weight:700; font-size:0.75rem;'>Running</span>"
             else:
                 bg = "rgba(100, 116, 139, 0.08)"
                 border = "#475569"
-                badge = "⏳"
+                icon_color = "#64748b"
+                badge = "<span style='color:#64748b; font-weight:700; font-size:0.75rem;'>Pending</span>"
             
             st.markdown(f"""
-            <div style="text-align:center; padding:8px 4px; background:{bg}; border-radius:8px; border:1px solid {border}33; min-height:80px;">
-                <div style="font-size:1.3rem;">{m['Icon']}</div>
-                <div style="font-size:0.65rem; color:#e2e8f0; font-weight:600; margin:2px 0;">{m['Phase']}</div>
-                <div style="font-size:0.7rem;">{badge}</div>
+            <div style="text-align:center; padding:12px 4px; background:{bg}; border-radius:8px; border:1px solid {border}33; min-height:90px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                <div style="margin-bottom: 4px;"><i class="{m['Icon']}" style="font-size:1.4rem; color:{icon_color};"></i></div>
+                <div style="font-size:0.65rem; color:#e2e8f0; font-weight:600; margin:4px 0;">{m['Phase']}</div>
+                <div>{badge}</div>
             </div>""", unsafe_allow_html=True)
 
     # ── NVIDIA RAPIDS GPU Acceleration Section ──
@@ -690,11 +700,11 @@ def render():
                     plot_bgcolor="rgba(0,0,0,0)",
                     font=dict(color="#e2e8f0"),
                     height=450,
-                    margin=dict(l=50, r=60, t=50, b=50),
+                    margin=dict(l=50, r=60, t=80, b=50),
                     legend=dict(
                         orientation="h",
                         yanchor="bottom",
-                        y=1.02,
+                        y=1.08,
                         xanchor="center",
                         x=0.5,
                         font=dict(size=11)
@@ -723,7 +733,66 @@ def render():
 
     LOOKER_URL = "https://datastudio.google.com/embed/reporting/56bf16f7-97ce-45a8-8354-f5bfcffe6d0d/page/EKu2F"
 
-    st.components.v1.iframe(LOOKER_URL, height=800, scrolling=True)
+    html_code = f"""
+        <style>
+            body {{
+                margin: 0;
+                padding: 0;
+                background-color: transparent;
+                overflow: hidden;
+            }}
+            .browser-frame {{
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                overflow: hidden;
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+                background: #0f0f1a;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }}
+            .browser-header {{
+                background: #151525;
+                padding: 12px;
+                display: flex;
+                align-items: center;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            }}
+            .browser-dot {{
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                margin-right: 8px;
+                display: inline-block;
+            }}
+            .dot-red {{ background: #ff5f56; }}
+            .dot-yellow {{ background: #ffbd2e; }}
+            .dot-green {{ background: #27c93f; }}
+            .browser-title {{
+                color: #94a3b8;
+                font-size: 0.8rem;
+                margin-left: auto;
+                margin-right: auto;
+                transform: translateX(-30px);
+                font-family: monospace;
+                letter-spacing: 0.5px;
+            }}
+            iframe {{
+                border: none;
+                width: 100%;
+                height: 800px;
+                display: block;
+            }}
+        </style>
+        <div class="browser-frame">
+            <div class="browser-header">
+                <div class="browser-dot dot-red"></div>
+                <div class="browser-dot dot-yellow"></div>
+                <div class="browser-dot dot-green"></div>
+                <span class="browser-title">lookerstudio.google.com/reporting/dami-executive-dashboard</span>
+            </div>
+            <iframe src="{LOOKER_URL}" scrolling="yes"></iframe>
+        </div>
+    """
+    st.components.v1.html(html_code, height=860)
 
 
 if __name__ == "__main__":

@@ -177,53 +177,98 @@ Return a JSON object with:
             except nx.NetworkXNoCycle:
                 break
                 
-        sorted_servers = list(nx.topological_sort(acyclic_G))
-        
-        # Wave Planning Grouping Logic
-        waves = {}
-        migrated = set()
-        
-        # 1. Wave 0: Pilot Wave
-        # Conditions: low risk, no dependencies (in-degree 0 in original graph), non-critical environment
-        pilot_candidates = []
-        for srv_id in sorted_servers:
-            risk_info = risk_map.get(srv_id, {})
-            score = risk_info.get("overall_risk_score", 5.0)
-            in_degree = G.in_degree(srv_id)
+        # Wave Planning Grouping Logic - Enterprise-Grade Application-Bundled Scheduling
+        srv_to_app = {}
+        app_srvs = {} # app_id -> list of srv_ids
+        for _, row in apps_df.iterrows():
+            app_id = row["app_id"]
+            server_list = row["server_ids"]
+            if server_list is not None and not (isinstance(server_list, float) and str(server_list) == 'nan'):
+                try:
+                    for srv_id in server_list:
+                        if srv_id in active_servers:
+                            srv_to_app[srv_id] = app_id
+                            app_srvs.setdefault(app_id, []).append(srv_id)
+                except (TypeError, ValueError):
+                    pass
+
+        # Standalone servers are treated as their own apps
+        for srv_id in active_servers:
+            if srv_id not in srv_to_app:
+                app_id = f"standalone-{srv_id}"
+                srv_to_app[srv_id] = app_id
+                app_srvs[app_id] = [srv_id]
+
+        # Determine app attributes
+        app_attrs = {}
+        for app_id, srv_ids in app_srvs.items():
+            envs = [servers_df.loc[servers_df["server_id"] == s, "environment"].values[0] for s in srv_ids if not servers_df.loc[servers_df["server_id"] == s, "environment"].empty]
+            is_prod = any(e.lower() in ["prod", "production"] for e in envs) if envs else True
             
-            if score < 4.0 and in_degree == 0 and srv_id not in migrated:
-                pilot_candidates.append(srv_id)
-                if len(pilot_candidates) >= 10:  # Pilot cap
-                    break
+            scores = [risk_map.get(s, {}).get("overall_risk_score", 5.0) for s in srv_ids]
+            max_score = max(scores) if scores else 5.0
+            
+            strategies = [risk_map.get(s, {}).get("recommended_strategy", "rehost") for s in srv_ids]
+            has_database = any(st.lower() == "replatform" for st in strategies)
+            has_refactor = any(st.lower() == "refactor" for st in strategies)
+            
+            # Initial wave assignment based on real-world complexity
+            if not is_prod:
+                if max_score < 4.5 and len(srv_ids) <= 6:
+                    wave_num = 0 # Pilot Wave (low-risk Dev/Staging)
+                else:
+                    wave_num = 1 # Non-Prod Standard Wave
+            else:
+                if has_refactor or max_score >= 7.5:
+                    wave_num = 4 # High-Complexity Wave (Tier 0 refactor/legacy)
+                elif has_database or max_score >= 5.5:
+                    wave_num = 3 # Business Critical Databases/Replatform (Tier 1)
+                else:
+                    wave_num = 2 # Production Rehost Wave (Tier 2 low-med risk)
                     
-        for srv_id in pilot_candidates:
-            waves.setdefault(0, []).append(srv_id)
-            migrated.add(srv_id)
+            app_attrs[app_id] = {
+                "wave": wave_num,
+                "is_prod": is_prod,
+                "max_score": max_score,
+                "has_database": has_database,
+                "has_refactor": has_refactor,
+                "srv_ids": srv_ids
+            }
+
+        # Resolve app-to-app dependencies
+        # Build App Dependency Graph
+        app_G = nx.DiGraph()
+        for app_id in app_attrs.keys():
+            app_G.add_node(app_id)
             
-        # 2. Sequential Waves (topological order)
-        current_wave = 1
-        wave_capacity = max_per_wave
-        
-        # Add remaining servers in topological order
-        for srv_id in sorted_servers:
-            if srv_id in migrated:
-                continue
+        for _, row in deps_df.iterrows():
+            src_app = row["source_app_id"]
+            dst_app = row["target_app_id"]
+            if src_app in app_attrs and dst_app in app_attrs:
+                app_G.add_edge(src_app, dst_app)
                 
-            # If server belongs to a circular group, try to migrate all of them together
-            scc_id = scc_map.get(srv_id)
-            group_to_add = [srv_id]
-            
-            if scc_id:
-                # Find all unmigrated servers in this group
-                group_to_add = [s for s, gid in scc_map.items() if gid == scc_id and s not in migrated]
-                
-            # If adding this group exceeds current wave capacity, increment wave
-            if len(waves.get(current_wave, [])) + len(group_to_add) > wave_capacity:
-                current_wave += 1
-                
-            for s in group_to_add:
-                waves.setdefault(current_wave, []).append(s)
-                migrated.add(s)
+        # Resolve topological order for dependencies: if App A depends on App B (B -> A in dependency graph)
+        # then App B (the dependency) must be migrated in a wave <= App A's wave.
+        changed = True
+        while changed:
+            changed = False
+            for u, v in app_G.edges():
+                if app_attrs[u]["wave"] > app_attrs[v]["wave"]:
+                    # Pull the prerequisite forward to the target's wave
+                    app_attrs[u]["wave"] = app_attrs[v]["wave"]
+                    changed = True
+
+        # Group servers into final waves
+        temp_waves = {}
+        for app_id, attr in app_attrs.items():
+            w_num = attr["wave"]
+            temp_waves.setdefault(w_num, []).extend(attr["srv_ids"])
+
+        # Map to sorted continuous waves (0, 1, 2, ...)
+        sorted_keys = sorted(temp_waves.keys())
+        waves = {}
+        for new_idx, old_key in enumerate(sorted_keys):
+            waves[new_idx] = temp_waves[old_key]
                 
         # Prepare BQ records
         wave_records = []

@@ -108,10 +108,29 @@ def render():
             
             net = Network(
                 height="500px", width="100%", 
-                bgcolor="#0f0f1a", font_color="#e2e8f0",
+                bgcolor="#07070d", font_color="#e2e8f0",
                 directed=True, select_menu=False, filter_menu=False
             )
-            net.barnes_hut(gravity=-3000, central_gravity=0.3, spring_length=150, spring_strength=0.05)
+            net.toggle_physics(True)
+            net.set_options("""
+            {
+              "physics": {
+                "barnesHut": {
+                  "gravitationalConstant": -10000,
+                  "centralGravity": 0.15,
+                  "springLength": 220,
+                  "springConstant": 0.03,
+                  "damping": 0.95,
+                  "avoidOverlap": 1
+                },
+                "minVelocity": 0.75,
+                "stabilization": {
+                  "enabled": true,
+                  "iterations": 1000
+                }
+              }
+            }
+            """)
             
             tier_colors = {
                 "web": "#6366f1", "app": "#8b5cf6", "db": "#22d3ee",
@@ -167,10 +186,27 @@ def render():
                 with open(graph_path, "r", encoding="utf-8") as f:
                     html_content = f.read()
                 
+                # Inject style overrides to ensure dark background and no borders/margins
+                override_style = """
+                <style>
+                    body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background-color: #07070d !important;
+                        overflow: hidden !important;
+                    }
+                    #mynetwork {
+                        border: none !important;
+                        background-color: #07070d !important;
+                    }
+                </style>
+                """
+                html_content = html_content.replace("</head>", f"{override_style}</head>")
+                
                 # Use base64 data URI iframe to avoid Streamlit IFrame JS module failures on Cloud Run
                 import base64
                 b64_html = base64.b64encode(html_content.encode("utf-8")).decode("utf-8")
-                iframe_html = f'<iframe src="data:text/html;base64,{b64_html}" width="100%" height="520" style="border:none; border-radius:8px;"></iframe>'
+                iframe_html = f'<iframe src="data:text/html;base64,{b64_html}" width="100%" height="520" style="border:none; border-radius:8px; background-color:#07070d;"></iframe>'
                 st.markdown(iframe_html, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Interactive graph rendering failed: {e}")

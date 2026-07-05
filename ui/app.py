@@ -22,7 +22,13 @@ st.set_page_config(
 # Custom Ethereal Architect CSS Injection
 def inject_custom_css():
     st.markdown('<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">', unsafe_allow_html=True)
+    st.markdown('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">', unsafe_allow_html=True)
     st.markdown("""<style>
+        /* Hide the radio button circle indicator in the sidebar */
+        div[data-testid="stSidebar"] label > div:first-child {
+            display: none !important;
+        }
+
         /* ===== DARK MODE (default) ===== */
         .stApp {
             background-color: #07070d;
@@ -98,24 +104,55 @@ def inject_custom_css():
         }
 
         /* Tabs */
-        .stTabs [data-baseweb="tab-list"] { gap: 4px; }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background-color: rgba(15, 15, 26, 0.5) !important;
+            padding: 6px !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(255, 255, 255, 0.04) !important;
+        }
         .stTabs [data-baseweb="tab"] {
-            border-radius: 8px 8px 0 0;
-            padding: 8px 16px;
-            transition: all 0.25s ease;
+            border-radius: 6px !important;
+            padding: 8px 18px !important;
+            transition: all 0.25s ease !important;
+            color: #94a3b8 !important;
+            border: none !important;
+            background-color: transparent !important;
         }
         .stTabs [data-baseweb="tab"]:hover {
-            background: rgba(99, 102, 241, 0.1);
+            background: rgba(99, 102, 241, 0.08) !important;
+            color: #a78bfa !important;
+        }
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%) !important;
+            color: #c084fc !important;
+            font-weight: 600 !important;
+            border: 1px solid rgba(139, 92, 246, 0.3) !important;
+        }
+
+        /* Inputs & Dropdowns */
+        div[data-baseweb="select"] {
+            background-color: rgba(15, 15, 26, 0.8) !important;
+            border: 1px solid rgba(99, 102, 241, 0.2) !important;
+            border-radius: 8px !important;
+            transition: all 0.3s ease !important;
+        }
+        div[data-baseweb="select"]:hover {
+            border-color: rgba(139, 92, 246, 0.4) !important;
+        }
+        div[data-baseweb="select"]:focus-within {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2) !important;
         }
 
         /* Sidebar Nav */
-        div[data-testid="stSidebar"] .stRadio > div { gap: 0px !important; }
+        div[data-testid="stSidebar"] .stRadio > div { gap: 6px !important; }
         div[data-testid="stSidebar"] .stRadio label {
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 8px 12px;
+            padding: 10px 16px;
             border-radius: 8px;
-            margin: 2px 0;
-            font-size: 0.88rem;
+            margin: 4px 0;
+            font-size: 0.92rem;
             border-left: 3px solid transparent;
         }
         div[data-testid="stSidebar"] .stRadio label:hover {
@@ -213,7 +250,10 @@ def inject_custom_css():
             border: 1px solid rgba(99, 102, 241, 0.25) !important;
             border-radius: 10px !important;
             color: #e2e8f0 !important;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease !important;
+            padding: 12px 14px !important;
+            line-height: 1.5 !important;
+            min-height: 46px !important;
         }
         div[data-testid="stChatInput"] textarea:focus {
             border-color: #6366f1 !important;
@@ -244,18 +284,18 @@ def main():
     st.sidebar.write("---")
     
     menu_options = [
-        "🏠 Dashboard",
-        "📤 Upload Center",
-        "📋 Server Inventory",
-        "🔗 Dependency Map",
-        "⚠️ Risk Assessment",
-        "🌊 Wave Gantt Chart",
+        "📊 Executive Dashboard",
+        "📥 Ingestion Center",
+        "🖥️ Server Inventory",
+        "🌐 Dependency Map",
+        "🛡️ Risk Assessment",
+        "📅 Migration Wave Plan",
         "🏗️ Target Architecture",
-        "💻 IaC & Runbooks",
-        "💰 TCO & FinOps",
-        "🛡️ Compliance & Security",
+        "⚙️ IaC & Runbooks",
+        "💵 FinOps & TCO",
+        "🔒 Compliance & Security",
         "🔌 Integrations",
-        "🔬 Agent Trace",
+        "🔍 Agent Trace",
         "🧠 Self-Learning",
         "💬 Conversational Assistant"
     ]
@@ -264,40 +304,40 @@ def main():
     
     # Render the selected page
     try:
-        if selection == "🏠 Dashboard":
+        if selection == "📊 Executive Dashboard":
             from ui.pages import dashboard
             dashboard.render()
-        elif selection == "📤 Upload Center":
+        elif selection == "📥 Ingestion Center":
             from ui.pages import upload
             upload.render()
-        elif selection == "📋 Server Inventory":
+        elif selection == "🖥️ Server Inventory":
             from ui.pages import inventory
             inventory.render()
-        elif selection == "🔗 Dependency Map":
+        elif selection == "🌐 Dependency Map":
             from ui.pages import dependencies
             dependencies.render()
-        elif selection == "⚠️ Risk Assessment":
+        elif selection == "🛡️ Risk Assessment":
             from ui.pages import risk
             risk.render()
-        elif selection == "🌊 Wave Gantt Chart":
+        elif selection == "📅 Migration Wave Plan":
             from ui.pages import wave_plan
             wave_plan.render()
         elif selection == "🏗️ Target Architecture":
             from ui.pages import architecture
             architecture.render()
-        elif selection == "💻 IaC & Runbooks":
+        elif selection == "⚙️ IaC & Runbooks":
             from ui.pages import iac_runbooks
             iac_runbooks.render()
-        elif selection == "💰 TCO & FinOps":
+        elif selection == "💵 FinOps & TCO":
             from ui.pages import finops
             finops.render()
-        elif selection == "🛡️ Compliance & Security":
+        elif selection == "🔒 Compliance & Security":
             from ui.pages import compliance
             compliance.render()
         elif selection == "🔌 Integrations":
             from ui.pages import integrations
             integrations.render()
-        elif selection == "🔬 Agent Trace":
+        elif selection == "🔍 Agent Trace":
             from ui.pages import agent_trace
             agent_trace.render()
         elif selection == "🧠 Self-Learning":

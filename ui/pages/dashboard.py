@@ -767,13 +767,21 @@ def render():
             .dot-yellow {{ background: #ffbd2e; }}
             .dot-green {{ background: #27c93f; }}
             .browser-title {{
-                color: #94a3b8;
                 font-size: 0.8rem;
                 margin-left: auto;
                 margin-right: auto;
                 transform: translateX(-30px);
                 font-family: monospace;
                 letter-spacing: 0.5px;
+            }}
+            .browser-title a {{
+                color: #94a3b8;
+                text-decoration: none;
+                transition: color 0.2s ease;
+            }}
+            .browser-title a:hover {{
+                color: #ffffff;
+                text-decoration: underline;
             }}
             iframe {{
                 border: none;
@@ -787,7 +795,11 @@ def render():
                 <div class="browser-dot dot-red"></div>
                 <div class="browser-dot dot-yellow"></div>
                 <div class="browser-dot dot-green"></div>
-                <span class="browser-title">lookerstudio.google.com/reporting/dami-executive-dashboard</span>
+                <span class="browser-title">
+                    <a href="https://lookerstudio.google.com/reporting/56bf16f7-97ce-45a8-8354-f5bfcffe6d0d" target="_blank">
+                        lookerstudio.google.com/reporting/56bf16f7-97ce-45a8-8354-f5bfcffe6d0d 🔗
+                    </a>
+                </span>
             </div>
             <iframe src="{LOOKER_URL}" scrolling="yes"></iframe>
         </div>

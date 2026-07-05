@@ -154,8 +154,8 @@ class RiskScorerAgent:
         bqml_predictions = {}  # server_id → predicted label (1=complex, 0=simple)
         try:
             # Quick check if BQML model exists
-            model_query = f"SELECT model_name FROM `{self.project_id}.{self.dataset}.__TABLES__` WHERE table_id = 'migration_risk_model'"
-            model_exists = len(client.query(model_query).to_dataframe()) > 0
+            client.get_model(f"{self.project_id}.{self.dataset}.migration_risk_model")
+            model_exists = True
             
             if model_exists:
                 # Run ML.PREDICT to get BQML predictions for all servers

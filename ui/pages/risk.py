@@ -200,11 +200,9 @@ def render():
         model_color = "#f59e0b"
         try:
             client = bigquery.Client(project=project_id)
-            model_query = f"SELECT model_name FROM `{project_id}.{dataset}.__TABLES__` WHERE table_id = 'migration_risk_model'"
-            model_check = client.query(model_query).to_dataframe()
-            if len(model_check) > 0:
-                model_status = "Trained ✅"
-                model_color = "#10b981"
+            client.get_model(f"{project_id}.{dataset}.migration_risk_model")
+            model_status = "Trained ✅"
+            model_color = "#10b981"
         except Exception:
             pass
         

@@ -109,7 +109,7 @@ class MemoryStore:
         if self.alloydb_available:
             self._store_alloydb(record)
         
-        print(f"[MemoryStore] Stored learning '{learning_type}' for {agent_name} → {memory_id}")
+        print(f"[MemoryStore] Stored learning '{learning_type}' for {agent_name} -> {memory_id}")
         return memory_id
     
     def retrieve_relevant_memories(

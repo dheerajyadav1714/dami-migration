@@ -67,7 +67,7 @@ def get_bq_context():
         
     try:
         # Get risk scoring distribution
-        risk_df = client.query(f"SELECT risk_level, COUNT(*) as count FROM `{project_id}.{dataset}.servers` GROUP BY risk_level").to_dataframe()
+        risk_df = client.query(f"SELECT risk_level, COUNT(*) as count FROM `{project_id}.{dataset}.risk_scores` GROUP BY risk_level").to_dataframe()
         context["risk_distribution"] = risk_df.to_dict(orient="records")
     except Exception as e:
         print(f"Failed to query risk distribution: {e}")
@@ -311,7 +311,7 @@ def get_orchestrator_response(query):
             "When the user asks a quantitative question, generate a BigQuery SQL query inside ```sql ... ``` blocks. "
             "IMPORTANT SQL RULES:\n"
             "- ALWAYS use column aliases for aggregations (e.g. COUNT(*) AS server_count, not bare COUNT(*)).\n"
-            "- All string values are LOWERCASE (e.g. risk_level='high' NOT 'High').\n"
+            "- BigQuery string comparisons are case-sensitive. Use LOWER(column) = 'value' (e.g. LOWER(power_state) = 'poweredoff') for case-insensitive matching, or match the exact database casing (e.g. power_state = 'poweredOff', target_gcp_service = 'Cloud DNS').\n"
             "- compliance_flags is ARRAY<STRING>. Use UNNEST() to filter (e.g. WHERE flag IN UNNEST(compliance_flags)).\n"
             "- Use LIMIT 20 for large result sets.\n\n"
             "Use ONLY these verified table schemas:\n"

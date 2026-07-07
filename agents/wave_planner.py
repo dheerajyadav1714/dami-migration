@@ -351,17 +351,37 @@ Return a JSON object with:
                 target_machine = arch_info.get("target_machine_type", "n2-standard-4")
                 target_region = arch_info.get("target_region", "us-central1")
                 
+                # Sanitization check for NaN / None values from Pandas
+                import pandas as pd
+                if pd.isnull(target_service) or not isinstance(target_service, str):
+                    target_service = "compute-engine"
+                if pd.isnull(target_machine) or not isinstance(target_machine, str):
+                    target_machine = "n2-standard-4"
+                if pd.isnull(target_region) or not isinstance(target_region, str):
+                    target_region = "us-central1"
+                if pd.isnull(strategy) or not isinstance(strategy, str):
+                    strategy = "rehost"
+                    
+                app_id = app_by_srv.get(srv_id, "unknown")
+                if pd.isnull(app_id) or not isinstance(app_id, str):
+                    app_id = "unknown"
+                    
+                effort = risk_info.get("estimated_effort_days", 2)
+                if pd.isnull(effort) or not isinstance(effort, (int, float)) or pd.isnull(effort):
+                    effort = 2.0
+                est_hours = float(effort * 8.0)
+                
                 workload_records.append({
                     "wave_id": w_id,
                     "server_id": srv_id,
-                    "app_id": app_by_srv.get(srv_id, "unknown"),
+                    "app_id": app_id,
                     "sequence_in_wave": idx + 1,
                     "migration_approach": strategy,
                     "target_gcp_service": target_service,
                     "target_machine_type": target_machine,
                     "target_region": target_region,
                     "prerequisites": [],
-                    "estimated_hours": float(risk_info.get("estimated_effort_days", 2) * 8.0),
+                    "estimated_hours": est_hours,
                     "project_id": self.project_id
                 })
                 
@@ -376,14 +396,17 @@ Return a JSON object with:
         
         try:
             # 1. Load waves
+            print("  Loading waves table...")
             job = client.load_table_from_json(wave_records, wave_table_ref, job_config=job_config)
             job.result()
             
             # 2. Load wave workloads
+            print("  Loading wave_workloads table...")
             job = client.load_table_from_json(workload_records, workload_table_ref, job_config=job_config)
             job.result()
             
             # 3. Update project status sandbox-safely
+            print("  Updating projects table...")
             proj_df = client.query(f"SELECT * FROM `{self.project_id}.{self.dataset}.projects`").to_dataframe()
             if not proj_df.empty:
                 import pandas as pd
@@ -403,6 +426,8 @@ Return a JSON object with:
                 job.result()
                 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             raise Exception(f"BigQuery load errors in wave planning: {e}")
             
         print(f"Wave planning complete. Structured {len(waves)} waves. Loaded to BigQuery.")

@@ -176,7 +176,7 @@ No markdown fences. No explanation. ONLY valid JSON array."""
         self._enrichment_context = dep_context + diagram_context + env_summary
 
         servers_list = servers_df.to_dict('records')
-        BATCH_SIZE = 10  # Balance between speed and JSON reliability
+        BATCH_SIZE = 34  # Balance between speed (3 batches instead of 10) and JSON reliability
         all_mappings = []
 
         for i in range(0, len(servers_list), BATCH_SIZE):

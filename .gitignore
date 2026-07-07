@@ -27,24 +27,13 @@ Thumbs.db
 .DS_Store
 
 # Internal docs (not for public repo)
-feedback.txt
-task.md
-implementation_plan.md
-walkthrough.md
-COMPLETE_SYSTEM_GUIDE.md
-DEMO_VIDEO_SCRIPT.md
-PITCH_DECK_OUTLINE.md
+docs/
 SUBMISSION_SUMMARY.md
-HACKATHON_WINNING_STRATEGY.md
-dami_system_architecture.md
 
 # Test/dev files
 test_*.py
 run.bat
 seed.bat
-
-# Generated at runtime
-generated_assets/
 *.log
 temp_*.html
 ui/_temp/

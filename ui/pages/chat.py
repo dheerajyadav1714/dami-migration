@@ -144,7 +144,7 @@ def _save_chat_to_bq(messages: list):
         print(f"Chat save to BQ failed (non-critical): {e}")
 
 def _load_chat_from_bq() -> list:
-    """Load chat session from BigQuery. Falls back to most recent session if current not found."""
+    """Load chat session from BigQuery. Falls back to most recent session ONLY if no session ID was in URL."""
     project_id = os.getenv("GCP_PROJECT_ID")
     dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
     session_id = _get_session_id()
@@ -163,23 +163,25 @@ def _load_chat_from_bq() -> list:
         if not df.empty:
             return [{"role": row["role"], "content": row["content"]} for _, row in df.iterrows()]
         
-        # Fallback: load the most recent session
-        df = client.query(f"""
-            SELECT session_id, role, content 
-            FROM `{project_id}.{dataset}.chat_history`
-            WHERE session_id = (
-                SELECT session_id FROM `{project_id}.{dataset}.chat_history`
-                ORDER BY timestamp DESC LIMIT 1
-            )
-            ORDER BY message_index
-        """).to_dataframe()
-        
-        if not df.empty:
-            # Update our session_id to match the loaded one
-            loaded_sid = df.iloc[0]["session_id"]
-            st.session_state.chat_session_id = loaded_sid
-            st.query_params["sid"] = loaded_sid
-            return [{"role": row["role"], "content": row["content"]} for _, row in df.iterrows()]
+        # Fallback: load the most recent session ONLY if 'sid' wasn't explicitly in query params
+        # (This distinguishes a fresh landing from a cleared session)
+        if "sid" not in st.query_params:
+            df = client.query(f"""
+                SELECT session_id, role, content 
+                FROM `{project_id}.{dataset}.chat_history`
+                WHERE session_id = (
+                    SELECT session_id FROM `{project_id}.{dataset}.chat_history`
+                    ORDER BY timestamp DESC LIMIT 1
+                )
+                ORDER BY message_index
+            """).to_dataframe()
+            
+            if not df.empty:
+                # Update our session_id to match the loaded one
+                loaded_sid = df.iloc[0]["session_id"]
+                st.session_state.chat_session_id = loaded_sid
+                st.query_params["sid"] = loaded_sid
+                return [{"role": row["role"], "content": row["content"]} for _, row in df.iterrows()]
     except Exception:
         pass
     return []

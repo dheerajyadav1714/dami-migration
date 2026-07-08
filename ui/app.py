@@ -297,6 +297,7 @@ def main():
         "🔑 License Risk",
         "✅ Validation",
         "🧭 Migration Advisor",
+        "🚀 Cutover Simulation",
         "🔌 Integrations",
         "🔍 Agent Trace",
         "🧠 Self-Learning",
@@ -346,6 +347,9 @@ def main():
         elif selection == "🧭 Migration Advisor":
             from ui.pages import migration_advisor
             migration_advisor.render()
+        elif selection == "🚀 Cutover Simulation":
+            from ui.pages import cutover
+            cutover.render()
         elif selection == "🔌 Integrations":
             from ui.pages import integrations
             integrations.render()

@@ -255,6 +255,166 @@ def render():
                     st.metric("F1 Score", f"{eval_result.get('f1_score', 0):.2%}")
             else:
                 st.warning(f"Model not trained yet or evaluation failed: {eval_result['error']}")
+    
+    # ── F5: BQML Probability Bands ──
+    st.write("---")
+    st.subheader("📊 BQML Confidence & Probability Bands")
+    st.caption("Shows the BQML model's prediction confidence for each server — not just the recommended strategy, "
+               "but how confident the model is. Low-confidence predictions indicate borderline workloads that need manual review.")
+    
+    try:
+        client_prob = bigquery.Client(project=project_id)
+        # Run ML.PREDICT to get probability distributions
+        prob_query = f"""
+            SELECT 
+                s.server_id,
+                s.name AS server_name,
+                s.vcpu,
+                s.ram_gb,
+                s.cpu_utilization_avg,
+                s.ram_utilization_avg,
+                s.workload_type,
+                p.predicted_is_complex,
+                p.predicted_is_complex_probs
+            FROM ML.PREDICT(
+                MODEL `{project_id}.{dataset}.migration_risk_model`,
+                (
+                    SELECT server_id, name, vcpu, ram_gb, 
+                           cpu_utilization_avg, ram_utilization_avg,
+                           workload_type,
+                           CASE 
+                               WHEN r.recommended_strategy IN ('refactor', 'replatform', 'relocate') THEN 1
+                               ELSE 0
+                           END AS is_complex
+                    FROM `{project_id}.{dataset}.servers` s
+                    LEFT JOIN `{project_id}.{dataset}.risk_scores` r ON s.server_id = r.server_id
+                )
+            ) p
+            JOIN `{project_id}.{dataset}.servers` s ON p.server_id = s.server_id
+            ORDER BY s.server_id
+        """
+        prob_df = client_prob.query(prob_query).to_dataframe()
+        
+        if not prob_df.empty and "predicted_is_complex_probs" in prob_df.columns:
+            # Extract probability for "complex" class
+            confidences = []
+            for _, row in prob_df.iterrows():
+                probs = row.get("predicted_is_complex_probs", [])
+                if isinstance(probs, list) and len(probs) > 0:
+                    # Find prob for class 1 (complex)
+                    complex_prob = 0.5
+                    for p in probs:
+                        if isinstance(p, dict) and p.get("label") == 1:
+                            complex_prob = p.get("prob", 0.5)
+                            break
+                    confidences.append({
+                        "server_name": row.get("server_name", "Unknown"),
+                        "predicted": int(row.get("predicted_is_complex", 0)),
+                        "complex_probability": complex_prob,
+                        "confidence": max(complex_prob, 1 - complex_prob),
+                        "vcpu": row.get("vcpu", 0),
+                        "ram_gb": row.get("ram_gb", 0),
+                    })
+                else:
+                    confidences.append({
+                        "server_name": row.get("server_name", "Unknown"),
+                        "predicted": int(row.get("predicted_is_complex", 0)),
+                        "complex_probability": 0.5,
+                        "confidence": 0.5,
+                        "vcpu": row.get("vcpu", 0),
+                        "ram_gb": row.get("ram_gb", 0),
+                    })
+            
+            conf_df = pd.DataFrame(confidences)
+            
+            # Probability bands chart
+            pb1, pb2 = st.columns([3, 2])
+            
+            with pb1:
+                
+                sorted_conf = conf_df.sort_values("complex_probability", ascending=True)
+                bar_colors = []
+                for p in sorted_conf["complex_probability"]:
+                    if p >= 0.8:
+                        bar_colors.append("#ef4444")  # High confidence complex
+                    elif p >= 0.6:
+                        bar_colors.append("#f97316")  # Moderate complex
+                    elif p >= 0.4:
+                        bar_colors.append("#fbbf24")  # Borderline
+                    elif p >= 0.2:
+                        bar_colors.append("#3b82f6")  # Moderate simple
+                    else:
+                        bar_colors.append("#10b981")  # High confidence simple
+                
+                fig_prob = go.Figure(go.Bar(
+                    x=sorted_conf["complex_probability"],
+                    y=sorted_conf["server_name"],
+                    orientation="h",
+                    marker_color=bar_colors,
+                    text=[f"{p:.0%}" for p in sorted_conf["complex_probability"]],
+                    textposition="auto",
+                    textfont=dict(color="#e2e8f0", size=9),
+                    hovertemplate="<b>%{y}</b><br>P(Complex): %{x:.1%}<extra></extra>",
+                ))
+                fig_prob.update_layout(
+                    title=dict(text="P(Complex Migration) — BQML Prediction", font=dict(color="#e2e8f0", size=13)),
+                    xaxis=dict(title="Probability of Complex Migration", range=[0, 1],
+                              gridcolor="rgba(100,116,139,0.1)"),
+                    yaxis=dict(title=""),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#e2e8f0"),
+                    height=max(350, len(sorted_conf) * 28),
+                    margin=dict(l=170, r=20, t=40, b=40),
+                )
+                # Add confidence zones
+                fig_prob.add_vrect(x0=0.4, x1=0.6, fillcolor="rgba(251,191,36,0.08)", 
+                                  line_width=0, annotation_text="⚠️ Borderline", 
+                                  annotation_position="top")
+                st.plotly_chart(fig_prob, use_container_width=True)
+            
+            with pb2:
+                # Confidence distribution
+                high_conf = len(conf_df[conf_df["confidence"] >= 0.8])
+                mid_conf = len(conf_df[(conf_df["confidence"] >= 0.6) & (conf_df["confidence"] < 0.8)])
+                low_conf = len(conf_df[conf_df["confidence"] < 0.6])
+                
+                st.markdown(f"""
+                <div style="background: rgba(30,30,47,0.5); border-radius: 10px; padding: 16px;">
+                    <div style="font-weight: 700; color: #e2e8f0; font-size: 0.95rem; margin-bottom: 12px;">
+                        Confidence Distribution
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #10b981; font-weight: 600;">🟢 High Confidence (≥80%):</span>
+                        <span style="color: #e2e8f0; font-weight: 700; float: right;">{high_conf} servers</span>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <span style="color: #fbbf24; font-weight: 600;">🟡 Moderate (60-80%):</span>
+                        <span style="color: #e2e8f0; font-weight: 700; float: right;">{mid_conf} servers</span>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <span style="color: #ef4444; font-weight: 600;">🔴 Low Confidence (<60%):</span>
+                        <span style="color: #e2e8f0; font-weight: 700; float: right;">{low_conf} servers</span>
+                    </div>
+                    <div style="border-top: 1px solid rgba(99,102,241,0.15); padding-top: 8px; font-size: 0.78rem; color: #94a3b8;">
+                        Low confidence predictions indicate borderline workloads that may benefit from 
+                        manual review or additional feature data.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Average confidence
+                avg_conf = conf_df["confidence"].mean() * 100
+                st.metric("Average Model Confidence", f"{avg_conf:.1f}%")
+                
+                # Borderline servers warning
+                borderline = conf_df[(conf_df["complex_probability"] >= 0.4) & (conf_df["complex_probability"] <= 0.6)]
+                if not borderline.empty:
+                    st.warning(f"⚠️ {len(borderline)} servers in the borderline zone (40-60%) — recommend manual review")
+        else:
+            st.info("Run ML.PREDICT to see probability distributions. The model is trained — click 'Evaluate Model Performance' above.")
+    except Exception as e:
+        st.info(f"BQML probability bands require a trained model. Train the model above to see confidence distributions. ({type(e).__name__})")
 
 if __name__ == "__main__":
     render()
+

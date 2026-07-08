@@ -242,6 +242,87 @@ def render():
     
     st.write("---")
     
+    # --- Applied Memories Section (NEW — F0) ---
+    st.subheader("🧠 Memory Applied in Agent Runs")
+    st.caption("Memories that were actively retrieved and injected into agent prompts during execution.")
+    
+    try:
+        client_am = bigquery.Client(project=project_id)
+        applied_df = client_am.query(f"""
+            SELECT memory_id, agent_name, learning_type,
+                   SUBSTR(corrected_output, 1, 120) as correction_summary,
+                   applied_count, effectiveness_score, created_at
+            FROM `{project_id}.{dataset}.agent_memories`
+            WHERE applied_count > 0
+            ORDER BY applied_count DESC, effectiveness_score DESC
+            LIMIT 10
+        """).to_dataframe()
+        
+        if not applied_df.empty:
+            # Summary metrics
+            am_col1, am_col2, am_col3 = st.columns(3)
+            with am_col1:
+                total_applied = int(applied_df["applied_count"].sum())
+                st.metric("Total Memory Applications", total_applied, delta="Active learning")
+            with am_col2:
+                unique_applied = len(applied_df)
+                st.metric("Unique Memories Used", unique_applied)
+            with am_col3:
+                avg_eff = float(applied_df["effectiveness_score"].mean())
+                st.metric("Avg Effectiveness", f"{avg_eff:.2f}")
+            
+            # Applied memories table
+            st.dataframe(
+                applied_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "memory_id": st.column_config.TextColumn("Memory ID", width="small"),
+                    "agent_name": st.column_config.TextColumn("Agent", width="medium"),
+                    "learning_type": st.column_config.TextColumn("Type", width="small"),
+                    "correction_summary": st.column_config.TextColumn("Correction", width="large"),
+                    "applied_count": st.column_config.NumberColumn("Times Applied", width="small"),
+                    "effectiveness_score": st.column_config.NumberColumn("Effectiveness", format="%.2f"),
+                }
+            )
+            
+            # Effectiveness bar chart
+            st.markdown("##### Memory Effectiveness Scores")
+            eff_fig = go.Figure(data=[
+                go.Bar(
+                    x=applied_df["memory_id"],
+                    y=applied_df["effectiveness_score"],
+                    marker_color=[
+                        "#10b981" if s >= 0 else "#ef4444" 
+                        for s in applied_df["effectiveness_score"]
+                    ],
+                    text=[f"{s:.2f}" for s in applied_df["effectiveness_score"]],
+                    textposition="auto",
+                    textfont=dict(color="#e2e8f0"),
+                )
+            ])
+            eff_fig.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font_color="#e2e8f0",
+                height=250,
+                margin=dict(l=40, r=20, t=20, b=60),
+                xaxis_title="Memory ID",
+                yaxis_title="Effectiveness Score",
+                xaxis=dict(gridcolor="rgba(99,102,241,0.1)"),
+                yaxis=dict(gridcolor="rgba(99,102,241,0.1)", zeroline=True, 
+                           zerolinecolor="rgba(255,255,255,0.2)"),
+            )
+            st.plotly_chart(eff_fig, use_container_width=True)
+        else:
+            st.info("No memories have been applied yet. Memories are automatically "
+                    "retrieved and injected when agents run (Risk Scorer, Architecture "
+                    "Designer, Wave Planner, IaC Generator).")
+    except Exception as e:
+        st.warning(f"Could not load applied memories: {e}")
+    
+    st.write("---")
+    
     # --- Architecture Diagram ---
     st.subheader("🏗️ Self-Learning Architecture")
     st.markdown("""
@@ -249,21 +330,30 @@ def render():
     ┌─────────────────────────────────────────────────────────────┐
     │                   D.A.M.I. Self-Learning Loop                │
     │                                                              │
-    │   Human Correction ──▶ Memory Store ──▶ Agent Context        │
+    │   Human Correction ──► Memory Store ──► Agent Context        │
     │         │                   │                │                │
     │         │          ┌───────┴───────┐        │                │
     │         │          │               │        ▼                │
     │         │    ┌─────┴─────┐  ┌──────┴─────┐                  │
     │         │    │  BigQuery  │  │  AlloyDB   │  Agent Decision  │
-    │         │    │  (keyword) │  │  (pgvector)│  ──▶ Output      │
+    │         │    │  (keyword) │  │  (pgvector)│  ──► Output      │
     │         │    └─────┬─────┘  └──────┬─────┘        │         │
     │         │          └───────┬───────┘              │         │
+    │         │                  │                       │         │
+    │         │     ┌────────────┴────────────┐         │         │
+    │         │     │  format_memories_for_   │         │         │
+    │         │     │  prompt() → Inject into │         │         │
+    │         │     │  agent system prompt    │         │         │
+    │         │     └────────────┬────────────┘         │         │
     │         │                  │                       │         │
     │         │          Retrieval Ranking               │         │
     │         │          (effectiveness_score)           │         │
     │         │                  │                       │         │
-    │         └──────────────────┘◀──── Outcome Tracking │         │
-    │                                   (was_helpful?)   │         │
+    │         └──────────────────┘◄──── Outcome Tracking │         │
+    │                   ▲              (was_helpful?)    │         │
+    │                   │                                │         │
+    │          increment_applied_count()                 │         │
+    │          (tracks memory usage)                     │         │
     └─────────────────────────────────────────────────────────────┘
     ```
     """)

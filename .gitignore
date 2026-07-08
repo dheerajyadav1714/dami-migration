@@ -44,3 +44,4 @@ data/seed/__pycache__/
 *.egg-info/
 dist/
 build/
+data/seed/sample_servers_100k.csv

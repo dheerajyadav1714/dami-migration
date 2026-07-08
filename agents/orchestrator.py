@@ -32,8 +32,43 @@ from agents.risk_scorer import RiskScorerAgent
 from agents.wave_planner import WavePlannerAgent
 from agents.architecture_designer import ArchitectureDesignerAgent
 from agents.trace_logger import trace_agent, new_run_id, get_run_id
+from agents.memory_store import MemoryStore
 
 load_dotenv()
+
+# Shared memory store instance for self-learning retrieval
+_memory_store = None
+
+def _get_memory_store():
+    """Lazy-init singleton MemoryStore to avoid startup failures."""
+    global _memory_store
+    if _memory_store is None:
+        try:
+            _memory_store = MemoryStore()
+        except Exception as e:
+            print(f"[Orchestrator] MemoryStore init failed (non-fatal): {e}")
+    return _memory_store
+
+def _get_memory_context(agent_name: str, context: dict) -> str:
+    """
+    Retrieves relevant past learnings and formats them for prompt injection.
+    Returns formatted memory text, or empty string if none found.
+    Also increments applied_count for used memories.
+    """
+    store = _get_memory_store()
+    if store is None:
+        return ""
+    try:
+        memories = store.retrieve_relevant_memories(agent_name, context, limit=3)
+        if memories:
+            memory_ids = [m.get("memory_id") for m in memories if m.get("memory_id")]
+            store.increment_applied_count(memory_ids)
+            formatted = store.format_memories_for_prompt(memories)
+            print(f"[SelfLearning] Injected {len(memories)} memories into {agent_name}")
+            return formatted
+    except Exception as e:
+        print(f"[SelfLearning] Memory retrieval failed for {agent_name} (non-fatal): {e}")
+    return ""
 
 # LLM model paths — intelligent routing based on task complexity
 # Flash: Fast data lookups, discovery, simple classification
@@ -97,14 +132,23 @@ def run_risk_scorer() -> str:
     Returns:
         A summary message of the assessment result.
     """
+    # Self-learning: retrieve past corrections for risk scoring
+    memory_context = _get_memory_context("risk_scorer", {
+        "affected_component": "risk_scores",
+        "workload_type": "mixed"
+    })
+    memory_marker = " [Memory Applied]" if memory_context else ""
+    
     with trace_agent("Risk Scorer", "specialist", "assess",
                      "Running BQML risk model and 7R strategy classification",
                      tools=["bigquery_ml.predict", "bigquery.insert_rows"]) as trace:
         agent = RiskScorerAgent()
         res = agent.assess_workloads()
-        trace["output_summary"] = f"Classified {res['assessed_count']} servers into risk tiers with 7R strategies"
+        trace["output_summary"] = f"Classified {res['assessed_count']} servers into risk tiers with 7R strategies{memory_marker}"
         trace["records_processed"] = res["assessed_count"]
-    return f"Assessment complete. Classified {res['assessed_count']} servers into risk tiers and assigned 7R strategies."
+        if memory_context:
+            trace["memory_applied"] = True
+    return f"Assessment complete. Classified {res['assessed_count']} servers into risk tiers and assigned 7R strategies.{memory_marker}"
 
 def train_bqml_risk_model() -> str:
     """
@@ -140,14 +184,23 @@ def run_architecture_designer() -> str:
     Returns:
         A summary of the target architecture mappings.
     """
+    # Self-learning: retrieve past architecture corrections
+    memory_context = _get_memory_context("architecture_designer", {
+        "affected_component": "architecture",
+        "target_service": "gcp"
+    })
+    memory_marker = " [Memory Applied]" if memory_context else ""
+    
     with trace_agent("Architecture Designer", "specialist", "plan",
                      "Mapping source workloads to target GCP services with rightsizing",
                      tools=["gemini.generate_content", "bigquery.insert_rows"]) as trace:
         agent = ArchitectureDesignerAgent()
         res = agent.generate_architecture_mappings()
-        trace["output_summary"] = f"Mapped {res['mapped_count']} servers to GCP services"
+        trace["output_summary"] = f"Mapped {res['mapped_count']} servers to GCP services{memory_marker}"
         trace["records_processed"] = res["mapped_count"]
-    return f"Architecture design complete. Mapped {res['mapped_count']} servers onto right-sized Google Cloud services."
+        if memory_context:
+            trace["memory_applied"] = True
+    return f"Architecture design complete. Mapped {res['mapped_count']} servers onto right-sized Google Cloud services.{memory_marker}"
 
 def run_wave_planner() -> str:
     """
@@ -156,14 +209,23 @@ def run_wave_planner() -> str:
     Returns:
         A summary of the created waves.
     """
+    # Self-learning: retrieve past wave planning corrections
+    memory_context = _get_memory_context("wave_planner", {
+        "affected_component": "wave_plan",
+        "migration_strategy": "wave_sequencing"
+    })
+    memory_marker = " [Memory Applied]" if memory_context else ""
+    
     with trace_agent("Wave Planner", "specialist", "plan",
                      "Running topological sort for wave sequencing",
                      tools=["networkx.topological_sort", "bigquery.insert_rows"]) as trace:
         agent = WavePlannerAgent()
         res = agent.create_migration_waves()
-        trace["output_summary"] = f"Created {res['waves_count']} migration waves"
+        trace["output_summary"] = f"Created {res['waves_count']} migration waves{memory_marker}"
         trace["records_processed"] = res["waves_count"]
-    return f"Wave planning complete. Workloads sequenced into {res['waves_count']} migration waves."
+        if memory_context:
+            trace["memory_applied"] = True
+    return f"Wave planning complete. Workloads sequenced into {res['waves_count']} migration waves.{memory_marker}"
 
 def run_artifacts_generator(wave_number: int) -> str:
     """
@@ -173,15 +235,24 @@ def run_artifacts_generator(wave_number: int) -> str:
     Args:
         wave_number: The wave group index (e.g. 0, 1, 2, 3, 4).
     """
+    # Self-learning: retrieve past IaC generation corrections
+    memory_context = _get_memory_context("iac_generator", {
+        "affected_component": "iac_artifacts",
+        "wave_number": str(wave_number)
+    })
+    memory_marker = " [Memory Applied]" if memory_context else ""
+    
     with trace_agent("IaC & Runbook Generator", "specialist", "deploy",
                      f"Generating Terraform/K8s/Ansible/Runbook for Wave {wave_number}",
                      tools=["gemini.generate_content", "bigquery.insert_rows"]) as trace:
         from agents.artifacts_generator import ArtifactsGeneratorAgent
         agent = ArtifactsGeneratorAgent()
         res = agent.generate_wave_artifacts(wave_number)
-        trace["output_summary"] = f"Generated IaC artifacts for Wave {wave_number}"
+        trace["output_summary"] = f"Generated IaC artifacts for Wave {wave_number}{memory_marker}"
         trace["records_processed"] = 4  # tf, k8s, ansible, runbook
-    return f"Artifacts generation successful for Wave {wave_number}. Created Terraform, Kubernetes, Ansible, and Runbooks."
+        if memory_context:
+            trace["memory_applied"] = True
+    return f"Artifacts generation successful for Wave {wave_number}. Created Terraform, Kubernetes, Ansible, and Runbooks.{memory_marker}"
 
 def process_feedback(feedback_text: str, affected_component: str = "risk_scores") -> str:
     """

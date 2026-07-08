@@ -146,13 +146,8 @@ def run_benchmark(spark, gcs_path, project_id, dataset_v3):
 
 
 def main():
-    # Parse arguments
-    if len(sys.argv) < 2:
-        print("Usage: spark_gpu_ingest.py <gcs_csv_path> [project_id] [dataset_v3]")
-        print("Example: spark_gpu_ingest.py gs://dami-migration-uploads/sample_servers_100k.csv")
-        sys.exit(1)
-    
-    gcs_path = sys.argv[1]
+    # Parse arguments (all have defaults for zero-config execution)
+    gcs_path = sys.argv[1] if len(sys.argv) > 1 else "gs://dami-migration-uploads/sample_servers_100k.csv"
     project_id = sys.argv[2] if len(sys.argv) > 2 else "cohort-2-497207"
     dataset_v3 = sys.argv[3] if len(sys.argv) > 3 else "dami_data_v3"
     

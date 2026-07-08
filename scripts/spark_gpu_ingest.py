@@ -87,7 +87,7 @@ def run_benchmark(spark, gcs_path, project_id, dataset_v3):
         "platform": "dataproc_serverless",
         "job_id": spark.sparkContext.applicationId,
         "details_json": f'{{"groups": {summary_count}, "gcs_path": "{gcs_path}"}}',
-        "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
     })
     
     # ---- CPU Baseline (disable RAPIDS for comparison) ----
@@ -125,7 +125,7 @@ def run_benchmark(spark, gcs_path, project_id, dataset_v3):
         "platform": "dataproc_serverless",
         "job_id": spark.sparkContext.applicationId,
         "details_json": '{"mode": "cpu_baseline"}',
-        "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
     })
     
     # ---- Write results to BigQuery ----
@@ -135,8 +135,8 @@ def run_benchmark(spark, gcs_path, project_id, dataset_v3):
     results_df.write \
         .format("bigquery") \
         .option("table", f"{project_id}.{dataset_v3}.gpu_benchmarks") \
-        .option("writeMethod", "direct") \
-        .mode("append") \
+        .option("temporaryGcsBucket", "dami-spark-deps-cohort-2-497207") \
+        .mode("overwrite") \
         .save()
     
     print(f"[DAMI-GPU] Benchmark complete! ID: {benchmark_id}")

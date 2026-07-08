@@ -294,6 +294,7 @@ def main():
         "⚙️ IaC & Runbooks",
         "💵 FinOps & TCO",
         "🔒 Compliance & Security",
+        "🔑 License Risk",
         "🔌 Integrations",
         "🔍 Agent Trace",
         "🧠 Self-Learning",
@@ -334,6 +335,9 @@ def main():
         elif selection == "🔒 Compliance & Security":
             from ui.pages import compliance
             compliance.render()
+        elif selection == "🔑 License Risk":
+            from ui.pages import license_risk
+            license_risk.render()
         elif selection == "🔌 Integrations":
             from ui.pages import integrations
             integrations.render()

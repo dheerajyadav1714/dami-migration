@@ -296,6 +296,7 @@ def main():
         "🔒 Compliance & Security",
         "🔑 License Risk",
         "✅ Validation",
+        "🧭 Migration Advisor",
         "🔌 Integrations",
         "🔍 Agent Trace",
         "🧠 Self-Learning",
@@ -342,6 +343,9 @@ def main():
         elif selection == "✅ Validation":
             from ui.pages import validation
             validation.render()
+        elif selection == "🧭 Migration Advisor":
+            from ui.pages import migration_advisor
+            migration_advisor.render()
         elif selection == "🔌 Integrations":
             from ui.pages import integrations
             integrations.render()

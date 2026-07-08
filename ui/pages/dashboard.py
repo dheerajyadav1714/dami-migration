@@ -8,6 +8,7 @@ from google.cloud import bigquery
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from datetime import datetime
 
 def get_project_stats(project_id, dataset):
     client = bigquery.Client(project=project_id)
@@ -87,6 +88,25 @@ def render():
             delta=f"{stats['savings_pct']}% Cost Reduction",
             delta_color="inverse"
         )
+    
+    # PDF Download Button
+    pdf_col1, pdf_col2, pdf_col3 = st.columns([2, 1, 2])
+    with pdf_col2:
+        if st.button("📄 Download Executive Report", use_container_width=True, type="primary"):
+            with st.spinner("Generating board-ready PDF report..."):
+                try:
+                    from agents.pdf_exporter import generate_pdf_report
+                    pdf_bytes = generate_pdf_report()
+                    st.download_button(
+                        label="💾 Save PDF",
+                        data=pdf_bytes,
+                        file_name=f"DAMI_Executive_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                    st.success("Report generated! Click 'Save PDF' to download.")
+                except Exception as e:
+                    st.error(f"PDF generation failed: {e}")
         
     st.write("---")
     

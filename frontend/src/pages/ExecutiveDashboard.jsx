@@ -440,7 +440,25 @@ export default function ExecutiveDashboard() {
 
         {/* GPU BENCHMARKS */}
         <div className="bg-[#131826] rounded-2xl p-6 border border-white/[0.05] shadow-lg mb-8">
-            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2"><Zap className="text-emerald-400 w-5 h-5" /> NVIDIA RAPIDS Performance Metrics</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2"><Zap className="text-emerald-400 w-5 h-5" /> NVIDIA RAPIDS Performance Metrics</h3>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => { axios.get('http://localhost:8000/api/project/benchmarks').then(r => setBenchmarks(r.data)).catch(()=>{}); }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/40 transition-all font-semibold"
+                >
+                  ↻ Refresh Results
+                </button>
+                <a 
+                  href="https://colab.research.google.com/github/dheerajyadav1714/dami-migration/blob/refinement-v3/notebooks/rapids_live_benchmark.ipynb"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/40 transition-all font-semibold flex items-center gap-1.5"
+                >
+                  <Rocket className="w-3.5 h-3.5" /> Open in Colab
+                </a>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1">
@@ -492,6 +510,40 @@ export default function ExecutiveDashboard() {
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
+            </div>
+        </div>
+
+        {/* COLAB LIVE BENCHMARK */}
+        <div className="bg-[#131826] rounded-2xl overflow-hidden border border-white/[0.05] shadow-lg mb-8">
+            <div className="bg-gradient-to-r from-[#0f141f] to-[#1a1040] px-6 py-4 flex items-center justify-between border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-sm">G</div>
+                <div>
+                  <div className="text-white font-bold text-sm">Live GPU Benchmark — Google Colab</div>
+                  <div className="text-slate-400 text-xs">Run real-time CPU vs GPU comparison on NVIDIA T4</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <a
+                  href="https://colab.research.google.com/github/dheerajyadav1714/dami-migration/blob/refinement-v3/notebooks/rapids_live_benchmark.ipynb" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-500/50 hover:from-emerald-500 hover:to-teal-500 text-white transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+                >
+                  <Rocket className="w-4 h-4" /> Run Live Benchmark
+                </a>
+              </div>
+            </div>
+            <div className="w-full h-[600px] bg-black">
+              <iframe
+                src="https://colab.research.google.com/github/dheerajyadav1714/dami-migration/blob/refinement-v3/notebooks/rapids_live_benchmark.ipynb"
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                style={{ border: 0 }}
+                allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+              ></iframe>
             </div>
         </div>
 

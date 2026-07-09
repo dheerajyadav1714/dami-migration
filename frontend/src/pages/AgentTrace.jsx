@@ -56,21 +56,44 @@ const DEFAULT_RUNS = [
 export default function AgentTrace() {
   const [expanded, setExpanded] = useState({ 0: true });
   const [runs, setRuns] = useState(DEFAULT_RUNS);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const toggle = (i) => setExpanded(prev => ({ ...prev, [i]: !prev[i] }));
 
-  const refreshTraces = () => {
+  const AGENT_ICONS = {
+    'discovery_agent': 'Database', 'dependency_mapper': 'Database', 'risk_scorer': 'Shield',
+    'wave_planner': 'Cpu', 'architecture_designer': 'Bot', 'iac_generator': 'Activity',
+    'feedback_agent': 'Shield', 'conversational_agent': 'Bot'
+  };
+
+  const loadTraces = () => {
     setLoading(true);
-    // Try to load real traces from the API
     axios.get('http://localhost:8000/api/agent/traces')
       .then(res => {
         if (res.data && res.data.length > 0) {
-          setRuns(res.data);
+          const converted = res.data.map(t => ({
+            agent: (t.agent_name || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            icon: AGENT_ICONS[t.agent_name] || 'Activity',
+            timestamp: t.timestamp ? new Date(t.timestamp).toLocaleString() : '',
+            status: t.status === 'completed' ? 'success' : t.status || 'success',
+            duration: t.duration_ms ? `${(t.duration_ms / 1000).toFixed(1)}s` : '—',
+            model: t.model_used || '',
+            tokens: t.tokens_used || 0,
+            steps: [
+              { action: 'Input', status: 'success', detail: t.input_summary || 'N/A', time: '—' },
+              { action: 'Processing', status: 'success', detail: `Model: ${t.model_used || 'gemini-2.5-flash'}, Tokens: ${t.tokens_used || 0}`, time: t.duration_ms ? `${(t.duration_ms / 1000).toFixed(1)}s` : '—' },
+              { action: 'Output', status: 'success', detail: t.output_summary || 'N/A', time: '—' },
+            ]
+          }));
+          setRuns(converted);
         }
       })
-      .catch(() => {}) // Keep defaults on error
+      .catch(() => {})
       .finally(() => setLoading(false));
   };
+
+  useEffect(() => { loadTraces(); }, []);
+
+  const refreshTraces = () => loadTraces();
 
   const successCount = runs.filter(r => r.status === 'success').length;
   const warningCount = runs.filter(r => r.status === 'warning').length;

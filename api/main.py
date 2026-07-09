@@ -625,11 +625,20 @@ async def get_agent_traces():
         try:
             client = bigquery.Client(project=project_id)
             query = f"SELECT * FROM `{project_id}.{dataset}.agent_execution_logs` ORDER BY timestamp DESC LIMIT 20"
-            df = client.query(query).to_dataframe()
-            if not df.empty:
-                traces = df.to_dict(orient='records')
-        except:
-            pass
+            results = client.query(query).result()
+            for row in results:
+                record = {}
+                for key in row.keys():
+                    val = row[key]
+                    if val is None:
+                        record[key] = ''
+                    elif isinstance(val, (int, float, str, bool)):
+                        record[key] = val
+                    else:
+                        record[key] = str(val)
+                traces.append(record)
+        except Exception as e:
+            print(f"Traces error: {e}")
     return traces
 
 @app.get("/api/learning/stats")

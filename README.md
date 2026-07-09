@@ -2,12 +2,13 @@
 
 > **AI-powered enterprise cloud migration accelerator** that replaces months of manual consulting with an autonomous multi-agent pipeline, GPU-accelerated data processing, and intelligent decision support.
 
-[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Cloud_Run-4285F4?style=for-the-badge)](https://dami-app-573585543580.us-central1.run.app)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.58-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Google Cloud](https://img.shields.io/badge/Google_Cloud-BigQuery_|_Vertex_AI_|_Cloud_Run-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](https://cloud.google.com)
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-RAPIDS_cuDF-76B900?style=flat-square&logo=nvidia&logoColor=white)](https://rapids.ai)
 [![Looker](https://img.shields.io/badge/Looker_Studio-Live_KPIs-4285F4?style=flat-square&logo=google&logoColor=white)](https://lookerstudio.google.com)
+[![Open In Colab](https://img.shields.io/badge/GPU_Benchmark-Open_In_Colab-F9AB00?style=flat-square&logo=googlecolab&logoColor=white)](https://colab.research.google.com/github/dheerajyadav1714/dami-migration/blob/refinement-v3/notebooks/rapids_live_benchmark.ipynb)
 
 ---
 
@@ -22,7 +23,7 @@
 |---|---|---|
 | 1 | **Real User** | Cloud Migration Architect / IT Infrastructure Director |
 | 2 | **Decision Bottleneck** | Manual VM analysis, dependency loops, risk assessment takes 6-18 months |
-| 3 | **Data Pipeline** | CSV → RAPIDS cuDF (GPU) → BigQuery (17 tables) → BQML → Gemini Agents |
+| 3 | **Data Pipeline** | CSV → RAPIDS cuDF (GPU) → BigQuery (11 tables in `dami_v3`) → BQML → Gemini Agents |
 | 4 | **Useful Output** | Wave plans, risk scores, architecture mappings, IaC, compliance reports, PDF |
 | 5 | **Acceleration Proof** | NVIDIA RAPIDS cuDF **28.7x GPU speedup** + AI pipeline **500x faster** than manual |
 
@@ -76,11 +77,16 @@ D.A.M.I. is an **Accelerated Data Intelligence Tool** that helps Cloud Migration
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        USER INTERFACE                               │
-│                   Streamlit UI (14 Pages)                           │
-│              Cloud Run (Auto-scaling, Serverless)                   │
-└─────────────────────────┬───────────────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────────────┐
+│            React 18 + Vite (25 Pages) │ Streamlit (Legacy)          │
+│               Recharts · Plotly · Lucide Icons                      │
+└──────────────────┬──────────────────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────────────────┐
+│                    FastAPI Backend (REST API)                        │
+│         25+ endpoints  │  BigQuery client  │  Gemini routing        │
+└──────────────────┬──────────────────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────────────────┐
 │                    AI AGENT PIPELINE (Google ADK)                    │
 │                                                                     │
 │  ASSESS (Parallel)          PLAN                    DEPLOY          │
@@ -90,20 +96,20 @@ D.A.M.I. is an **Accelerated Data Intelligence Tool** that helps Cloud Migration
 │  │ ⚡ Risk Scorer   │  │ 🧠 Wave Planner  │  │ ⚡ Feedback Agent  │ │
 │  └─────────────────┘  └──────────────────┘  └────────────────────┘ │
 │  gemini-2.5-flash       gemini-2.5-pro        gemini-flash/pro     │
-└─────────────────────────┬───────────────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────────────┐
+└──────────────────┬──────────────────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────────────────┐
 │              GOOGLE CLOUD DATA & APPLICATION LAYER                  │
 │                                                                     │
-│  BigQuery (17 Tables)  │  BigQuery ML     │  Vertex AI / Gemini    │
+│  BigQuery (dami_v3)    │  BigQuery ML     │  Vertex AI / Gemini    │
 │  Cloud Storage (GCS)   │  (Risk Models)   │  (Flash ↔ Pro Routing) │
-└─────────────────────────┬───────────────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────────────┐
+└──────────────────┬──────────────────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────────────────┐
 │                  NVIDIA ACCELERATION LAYER                          │
 │                                                                     │
-│  RAPIDS cuDF            │  GPU DataFrames  │  28.7x Peak Speedup   │
-│  (GPU-accelerated ETL)  │  (cudf.pandas)   │  at 100K rows         │
+│  RAPIDS cuDF            │  Google Colab    │  Live T4 GPU Benchmark │
+│  (GPU-accelerated ETL)  │  (cudf.pandas)   │  Results → BigQuery    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -152,25 +158,35 @@ D.A.M.I. automatically routes queries to the optimal Gemini model:
 
 ---
 
-## 📊 Key Features
+## 📊 Key Features (25 Pages)
 
 | Feature | Description |
 |---|---|
-| **📊 Executive Dashboard** | KPI grid, readiness gauge, acceleration impact, progress timeline |
-| **📈 Looker Dashboard** | Executive migration KPIs — risk distribution, TCO comparison, wave progress (embedded live BigQuery data) |
-| **📥 Ingestion Center** | Multi-format upload to GCS + RAPIDS cuDF CPU vs GPU benchmark |
-| **🖥️ Server Inventory** | Live BigQuery data explorer with filtering |
-| **🌐 Dependency Map** | Interactive PyVis + Graphviz + circular loop detection |
-| **🛡️ Risk Assessment** | BQML risk heatmap, strategy distribution, model training |
-| **🏗️ Target Architecture** | AI-recommended GCP service mapping + multi-cloud topology with CIDR ranges |
-| **📅 Migration Wave Plan** | AI-powered wave timeline with Gemini-generated rationale |
-| **💵 FinOps & TCO** | What-If cost simulator with oversubscription sliders |
-| **⚙️ IaC & Runbooks** | Terraform, K8s, Ansible, Dockerfile generation + rollback plans |
-| **🔒 Compliance & Security** | HIPAA/PCI-DSS/SOC2/ISO27001 gap analysis + remediation |
-| **🔍 Agent Trace** | Full execution trace timeline with Gantt visualization |
-| **💬 Conversational Assistant** | NL → SQL → BigQuery with persistent chat + model routing badge |
-| **🔌 Integrations** | Jira, GitHub, Confluence sync center |
-| **🧠 Self-Learning** | BigQuery + AlloyDB pgvector agent memory feedback loops |
+| **📊 Executive Dashboard** | KPI grid, readiness gauge, RAPIDS benchmark, Colab embed, Looker Studio |
+| **📥 Ingestion Center** | Data quality profiling + zombie VM detection from BigQuery |
+| **🖥️ Server Inventory** | 10K server explorer with search, sort, filter |
+| **🌐 Dependency Map** | Interactive graph + circular loop detection |
+| **🛡️ Risk Assessment** | BQML risk heatmap + Gartner 7R strategy distribution |
+| **🏗️ Target Architecture** | AI-recommended GCP service mapping |
+| **📅 Wave Plan** | AI topological sorting → wave sequencing with timeline |
+| **💵 FinOps & TCO** | Dynamic cost projections from real BigQuery stats |
+| **⚙️ IaC & Runbooks** | Terraform, K8s, Ansible, Dockerfile generation |
+| **🔒 Compliance** | HIPAA/PCI-DSS/SOC2/ISO27001 gap analysis heatmap |
+| **🔍 Agent Trace** | Real-time execution trace from BigQuery logs |
+| **💬 Chat** | NL → SQL → BigQuery conversational assistant |
+| **🔌 Integrations** | Jira, GitHub, Confluence sync |
+| **🧠 Self-Learning** | Agent memory feedback loops (BigQuery) |
+| **✅ Go/No-Go Validation** | 7-category migration readiness checklist |
+| **🗃️ Database Advisor** | DB-specific migration recommendations |
+| **📝 Code Refactoring** | Application modernization suggestions |
+| **⚖️ VMware License Risk** | License compliance risk intelligence |
+| **👥 Stakeholders** | RACI matrix + stakeholder tracking |
+| **🌫️ Shadow IT** | Undocumented server detection |
+| **🌿 Carbon Footprint** | Migration sustainability impact |
+| **📊 Quota Checker** | GCP quota validation pre-migration |
+| **📅 Blackout Calendar** | Change freeze window management |
+| **🔐 Data Sensitivity** | PII/PHI classification scanner |
+| **✂️ Cutover Runbooks** | Step-by-step migration execution guides |
 
 ---
 
@@ -207,9 +223,8 @@ D.A.M.I. uses **Gemini Vision** to extract infrastructure components from upload
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11+ & Node.js 18+
 - Google Cloud project with BigQuery & Vertex AI enabled
-- NVIDIA GPU with CUDA support (for RAPIDS cuDF acceleration)
 - `gcloud` CLI authenticated (`gcloud auth application-default login`)
 
 ### Local Development
@@ -218,25 +233,35 @@ D.A.M.I. uses **Gemini Vision** to extract infrastructure components from upload
 # Clone
 git clone https://github.com/dheerajyadav1714/dami-migration.git
 cd dami-migration
+git checkout refinement-v3
 
-# Setup
+# Backend Setup
 python -m venv .venv
-source .venv/bin/activate    # Linux/Mac
-# .venv\Scripts\activate     # Windows
-
+.venv\Scripts\activate       # Windows
+# source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # Configure
 cp .env.example .env
-# Edit .env with your GCP project details
+# Edit .env: GCP_PROJECT_ID=cohort-2-497207, BIGQUERY_DATASET=dami_v3
 
-# Bootstrap BigQuery
-python scripts/create_bq_tables.py
-python scripts/seed_database.py
+# Frontend Setup
+cd frontend && npm install && cd ..
 
-# Run
-streamlit run ui/app.py
+# Start all services (3 terminals)
+python api/main.py                    # Terminal 1: FastAPI backend (port 8000)
+cd frontend && npm run dev            # Terminal 2: React frontend (port 5173)
+streamlit run ui/app.py               # Terminal 3: Streamlit legacy (port 8501)
 ```
+
+### Live GPU Benchmark
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dheerajyadav1714/dami-migration/blob/refinement-v3/notebooks/rapids_live_benchmark.ipynb)
+
+1. Click the badge above to open the benchmark notebook
+2. Select **Runtime → Change runtime type → T4 GPU → Save**
+3. Click **Runtime → Run all** (Ctrl+F9)
+4. Watch CPU vs GPU comparison live — results auto-write to BigQuery
 
 ### Deploy to Cloud Run
 
@@ -259,25 +284,32 @@ dami-migration/
 ├── agents/                    # 8 ADK specialist agents
 │   ├── orchestrator.py        # DAG workflow with Flash ↔ Pro routing
 │   ├── discovery.py           # RAPIDS cuDF ingestion
-│   ├── intake.py              # Gemini Vision diagram analysis
 │   ├── dependency_mapper.py   # NetworkX graph + loop detection
 │   ├── risk_scorer.py         # BQML ML.PREDICT pipeline
-│   ├── architecture_designer.py # Deep BQ context → GCP service mapping
-│   ├── wave_planner.py        # AI topological sorting + rationale
-│   ├── artifacts_generator.py # Terraform/K8s/Ansible → GCS
-│   ├── report_generator.py    # Executive PDF/MD reports
-│   ├── memory_store.py        # AlloyDB pgvector feedback loops
+│   ├── architecture_designer.py # GCP service mapping
+│   ├── wave_planner.py        # AI topological sorting
+│   ├── artifacts_generator.py # Terraform/K8s/Ansible
+│   ├── report_generator.py    # Executive PDF reports
+│   ├── memory_store.py        # Self-learning feedback loops
 │   └── trace_logger.py        # Agent execution tracing
-├── api/                       # FastAPI backend
-├── data/seed/                 # Sample RVTools CSV data
-├── schemas/                   # BigQuery table schemas (17 tables)
-├── scripts/                   # Setup and seeding scripts
+├── api/
+│   └── main.py                # FastAPI backend (25+ endpoints)
+├── frontend/
+│   ├── src/
+│   │   ├── pages/             # 25 React page components
+│   │   ├── components/        # Shared UI components (Sidebar, Layout)
+│   │   └── App.jsx            # Router + navigation
+│   └── package.json           # React + Vite + Recharts + Plotly
+├── notebooks/
+│   └── rapids_live_benchmark.ipynb  # Colab GPU benchmark
 ├── ui/
-│   ├── app.py                 # Main Streamlit app + CSS design system
-│   └── pages/                 # 14 feature pages
+│   ├── app.py                 # Streamlit legacy interface
+│   └── pages/                 # Streamlit pages
+├── data/seed/                 # Sample RVTools CSV data
+├── schemas/                   # BigQuery table schemas
+├── scripts/                   # Setup and seeding scripts
 ├── Dockerfile                 # Cloud Run container
-├── requirements.txt           # Local dependencies
-├── requirements-cloud.txt     # Cloud Run dependencies
+├── requirements.txt           # Python dependencies
 └── README.md
 ```
 

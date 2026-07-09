@@ -29,6 +29,19 @@ Thumbs.db
 # Internal docs (not for public repo)
 docs/
 SUBMISSION_SUMMARY.md
+Feedback.txt
+
+# Temporary/dev scripts (not production code)
+build_perfect_dashboard.py
+convert_html_to_jsx.py
+generate_mockups.py
+test_output.json
+
+# HTML mockups (development artifacts, not production)
+mockups/
+
+# Generated assets (build artifacts)
+generated_assets/
 
 # Test/dev files
 test_*.py
@@ -40,8 +53,12 @@ ui/_temp/
 data/seed/graph.html
 data/seed/__pycache__/
 
-# Byte-compiled
+# Byte-compiled / dist
 *.egg-info/
 dist/
 build/
 data/seed/sample_servers_100k.csv
+
+# Frontend build output
+frontend/node_modules/
+frontend/dist/

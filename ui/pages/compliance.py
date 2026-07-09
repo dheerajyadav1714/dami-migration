@@ -91,7 +91,7 @@ def render():
     st.write("---")
 
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     client = get_bq_client(project_id)
 
     df = fetch_compliance_data(client, project_id, dataset)
@@ -597,6 +597,52 @@ resource "google_project_iam_audit_config" "full_audit" {
             st.code("\n\n".join(remediation_cmds), language="bash")
     else:
         st.success("✅ All compliance controls are auto-mapped! No gaps detected.")
+
+    st.write("---")
+    st.subheader("🛡️ AI Zero-Trust Security Policy Generator")
+    st.write("Automatically generate strict Network Policies and Firewall Rules based on observed application dependency traffic.")
+    
+    if st.button("🔒 Generate Zero-Trust Policies", type="primary"):
+        with st.spinner("Gemini is analyzing dependencies to generate Zero-Trust rules..."):
+            import json
+            from google.genai import Client
+            from google.genai import types
+            
+            try:
+                deps_df = client.query(f"SELECT source_server_id, target_server_id, port, protocol FROM `{project_id}.{dataset}.dependencies` LIMIT 50").to_dataframe()
+                deps_json = json.dumps(deps_df.to_dict('records'))
+                
+                api_key = os.getenv("GEMINI_API_KEY")
+                if api_key:
+                    genai_client = Client(api_key=api_key)
+                    model_name = "gemini-2.5-pro"
+                else:
+                    genai_client = Client(enterprise=True)
+                    model_name = f"projects/{os.getenv('VERTEX_PROJECT_ID', 'gcp-experiments-490315')}/locations/{os.getenv('VERTEX_AI_LOCATION', 'us-central1')}/publishers/google/models/gemini-2.5-pro"
+                
+                prompt = f"""
+                You are a DevSecOps Engineer. Based on the following application dependency map, generate strict Zero-Trust security rules.
+                
+                1. Output a Kubernetes `NetworkPolicy` YAML for GKE workloads that ONLY allows the exact observed ports.
+                2. Output Terraform `google_compute_firewall` blocks for GCP VMs restricting traffic.
+                
+                Dependencies observed:
+                {deps_json}
+                """
+                
+                response = genai_client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(temperature=0.2)
+                )
+                
+                st.session_state["zero_trust_code"] = response.text
+                st.success("Zero-Trust Security Policies generated successfully!")
+            except Exception as e:
+                st.error(f"Failed to generate Zero-Trust policies: {e}")
+                
+    if "zero_trust_code" in st.session_state:
+        st.markdown(st.session_state["zero_trust_code"])
 
 
 if __name__ == "__main__":

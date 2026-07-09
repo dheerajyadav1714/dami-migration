@@ -45,9 +45,17 @@ def render():
             st.info(f"Target Project Key: **{st.session_state.get('jira_proj', 'MIG')}**")
             
             if st.button("🚀 Sync Waves to Jira Board", use_container_width=True):
-                with st.spinner("Generating Epics and tasks for Wave 0, 1, 2, 3, 4..."):
-                    time.sleep(2.0)
-                st.success("Jira board updated! Created 5 Epics and 100 workload migration sub-tasks successfully.")
+                with st.spinner("Connecting to Jira API & Generating Epics..."):
+                    from agents.jira_agent import JiraAgent
+                    domain = st.session_state.get('jira_dom', 'acme.atlassian.net')
+                    proj = st.session_state.get('jira_proj', 'MIG')
+                    agent = JiraAgent(domain, proj)
+                    res = agent.sync_waves()
+                    
+                if res.get("success"):
+                    st.success(f"Jira board updated! Created {res['epics_created']} Epics (Tickets: {', '.join(res['keys'][:3])}...).")
+                else:
+                    st.error(f"Failed to sync with Jira: {res.get('error')}")
                 
             if st.button("🔌 Disconnect Jira", use_container_width=True):
                 vault.delete_secret("jira_token")

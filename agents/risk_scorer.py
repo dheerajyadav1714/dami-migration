@@ -10,7 +10,7 @@ load_dotenv()
 class RiskScorerAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         
     def determine_7r_strategy(self, server: dict, dependency_count: int, has_db: bool) -> tuple:
         """

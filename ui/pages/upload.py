@@ -60,7 +60,7 @@ def get_hygiene_report(project_id, dataset):
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     gcs_bucket = os.getenv("GCS_BUCKET", "dami-artifacts-cohort-2")
     
     st.markdown("<h1 class='gradient-text'>Data Ingestion & Upload Center</h1>", unsafe_allow_html=True)
@@ -390,7 +390,7 @@ def render():
     st.write("Automatically scans active BigQuery inventory records to identify quality gaps, licensing conflicts, and defunct virtual machines.")
     
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     report = get_hygiene_report(project_id, dataset)
     

@@ -59,7 +59,7 @@ def process_data_pandas(file_path: str):
 class DiscoveryAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         
     def run_benchmark(self, file_path: str) -> dict:
         """
@@ -201,86 +201,15 @@ class DiscoveryAgent:
         and populates BigQuery servers table.
         """
         import pandas as pd
+        from agents.parsers import get_parser
         
         print(f"Normalizing '{source_type}' inventory from '{file_path}'...")
         
         # Load file
         df = pd.read_csv(file_path)
         
-        normalized_servers = []
-        
-        if source_type == "vmware":
-            # Map RVTools columns
-            for idx, row in df.iterrows():
-                vm_name = row["VM"]
-                
-                # Classify workload
-                workload = "DEV"
-                if "LB" in vm_name: workload = "LB"
-                elif "WEB" in vm_name: workload = "WEB"
-                elif "APP" in vm_name: workload = "APP"
-                elif "DB" in vm_name: workload = "DB"
-                elif "CACHE" in vm_name: workload = "CACHE"
-                elif "QUEUE" in vm_name: workload = "QUEUE"
-                elif "INFRA" in vm_name: workload = "INFRA"
-                
-                # Environment
-                env = "prod" if "-PROD" in vm_name else "staging" if "-STAGE" in vm_name else "dev"
-                
-                # Conversion
-                disk_gb = float(row["Provisioned MiB"]) / 1024.0
-                
-                normalized_servers.append({
-                    "server_id": f"srv-{idx:04d}",
-                    "name": vm_name,
-                    "vcpu": int(row["CPUs"]),
-                    "ram_gb": float(row["Memory"]),
-                    "disk_gb": round(disk_gb, 2),
-                    "os": row["OS according to the configuration file"],
-                    "os_version": "unknown",
-                    "ip_address": row["IP Address"],
-                    "cluster": row["Cluster"],
-                    "datacenter": "On-Prem Datacenter",
-                    "power_state": row["Powerstate"],
-                    "cpu_utilization_avg": float(row["CPU_Avg"]),
-                    "ram_utilization_avg": float(row["RAM_Avg"]),
-                    "workload_type": workload,
-                    "app_owner": "owner@company.com",
-                    "environment": env,
-                    "source_platform": "vmware",
-                    "project_id": self.project_id
-                })
-                
-        elif source_type == "aws":
-            # Map AWS EC2 Export Columns
-            # Expected columns: InstanceId, InstanceType, OS, PublicIP, vCPU, Memory, etc.
-            for idx, row in df.iterrows():
-                inst_id = row.get("InstanceId", f"i-{idx:08d}")
-                inst_name = row.get("Name", inst_id)
-                # Parse memory e.g. "8 GiB" -> 8
-                mem_str = str(row.get("Memory", "4"))
-                mem_gb = float(''.join(c for c in mem_str if c.isdigit() or c == '.'))
-                
-                normalized_servers.append({
-                    "server_id": inst_id,
-                    "name": inst_name,
-                    "vcpu": int(row.get("vCPU", 2)),
-                    "ram_gb": mem_gb,
-                    "disk_gb": float(row.get("DiskGB", 50.0)),
-                    "os": row.get("OS", "Linux"),
-                    "os_version": "unknown",
-                    "ip_address": row.get("PrivateIP", "10.0.0.1"),
-                    "cluster": "AWS-VPC-Prod",
-                    "datacenter": row.get("AvailabilityZone", "us-east-1a"),
-                    "power_state": "poweredOn" if row.get("State") == "running" else "poweredOff",
-                    "cpu_utilization_avg": float(row.get("CPUPercent", 20.0)),
-                    "ram_utilization_avg": float(row.get("RAMPercent", 40.0)),
-                    "workload_type": "APP" if "app" in inst_name.lower() else "DB" if "db" in inst_name.lower() else "WEB",
-                    "app_owner": "aws-team@company.com",
-                    "environment": "prod",
-                    "source_platform": "aws",
-                    "project_id": self.project_id
-                })
+        parser = get_parser(source_type, self.project_id)
+        normalized_servers = parser.parse(df)
                 
         # Load into BigQuery
         client = bigquery.Client(project=self.project_id)

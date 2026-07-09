@@ -11,9 +11,9 @@ def get_bq_client(project_id):
 
 def fetch_finops_data(client, project_id, dataset):
     try:
-        # Query on-premises source specs
+        # Query on-premises source specs with utilization
         servers_query = f"""
-            SELECT vcpu, ram_gb, disk_gb 
+            SELECT name, vcpu, ram_gb, disk_gb, cpu_utilization_avg, ram_utilization_avg 
             FROM `{project_id}.{dataset}.servers`
         """
         servers_df = client.query(servers_query).to_dataframe()
@@ -39,54 +39,92 @@ def render():
     
     # What-If Simulator configuration sliders in Sidebar
     st.sidebar.markdown("---")
-    st.sidebar.subheader("💰 TCO What-If Simulator")
+    st.sidebar.subheader("💰 FinOps Right-Sizing Engine")
     st.sidebar.caption("Fine-tune rightsizing parameters to balance performance buffers against cost savings.")
     
-    oversubscription = st.sidebar.slider(
-        "CPU Oversubscription Ratio",
-        min_value=1.0,
-        max_value=4.0,
-        value=2.0,
-        step=0.5,
-        help="Ratio of virtual CPUs mapped to a physical host core. Higher ratios increase savings for non-production workloads."
+    sizing_mode = st.sidebar.radio(
+        "Sizing Strategy",
+        ["1:1 Spec Match (Conservative)", "AI Right-Sizing (Optimized)"],
+        index=1,
+        help="1:1 matches current cores exactly. AI Right-Sizing downsizes based on historical utilization."
     )
     
-    headroom = st.sidebar.slider(
-        "Performance Safety Headroom (%)",
-        min_value=10,
-        max_value=50,
-        value=20,
-        step=5,
-        help="Safety buffer added to average resource utilization to handle seasonal load spikes."
-    )
+    if sizing_mode == "AI Right-Sizing (Optimized)":
+        oversubscription = st.sidebar.slider(
+            "CPU Oversubscription Ratio",
+            min_value=1.0,
+            max_value=4.0,
+            value=2.0,
+            step=0.5,
+            help="Ratio of virtual CPUs mapped to a physical host core. Higher ratios increase savings for non-production workloads."
+        )
+        
+        headroom = st.sidebar.slider(
+            "Performance Safety Headroom (%)",
+            min_value=10,
+            max_value=50,
+            value=20,
+            step=5,
+            help="Safety buffer added to average resource utilization to handle seasonal load spikes."
+        )
+    else:
+        oversubscription = 1.0
+        headroom = 0
     
     st.write("---")
     
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     client = get_bq_client(project_id)
     
     servers_df, target_df = fetch_finops_data(client, project_id, dataset)
     
+    top_savings = None
+    
     if servers_df is not None and not servers_df.empty and target_df is not None and not target_df.empty:
+        # Normalize utilization data
+        if "cpu_utilization_avg" in servers_df.columns:
+            servers_df["cpu_utilization_avg"] = pd.to_numeric(servers_df["cpu_utilization_avg"], errors="coerce").fillna(50.0).clip(lower=1.0)
+            servers_df["ram_utilization_avg"] = pd.to_numeric(servers_df["ram_utilization_avg"], errors="coerce").fillna(50.0).clip(lower=1.0)
+        else:
+            servers_df["cpu_utilization_avg"] = 50.0
+            servers_df["ram_utilization_avg"] = 50.0
+            
         # Calculate dynamic on-prem TCO
         # Baseline: $35/vCPU, $3.50/GB RAM, $0.12/GB Disk, plus $60/server hosting overhead
-        total_vcpus = servers_df["vcpu"].sum()
-        total_ram = servers_df["ram_gb"].sum()
-        total_disk = servers_df["disk_gb"].sum()
-        total_servers = len(servers_df)
+        servers_df["on_prem_monthly"] = (servers_df["vcpu"] * 35.0) + (servers_df["ram_gb"] * 3.50) + (servers_df["disk_gb"] * 0.12) + 60.0
+        on_prem_cost = servers_df["on_prem_monthly"].sum()
         
-        on_prem_cost = (total_vcpus * 35.0) + (total_ram * 3.50) + (total_disk * 0.12) + (total_servers * 60.0)
+        # Calculate AI Right-Sized Specs
+        if sizing_mode == "AI Right-Sizing (Optimized)":
+            # Rightsize based on utilization + headroom
+            servers_df["suggested_vcpu"] = (servers_df["vcpu"] * (servers_df["cpu_utilization_avg"] / 100.0) * (1 + headroom/100.0)).apply(lambda x: max(1, round(x)))
+            servers_df["suggested_ram"] = (servers_df["ram_gb"] * (servers_df["ram_utilization_avg"] / 100.0) * (1 + headroom/100.0)).apply(lambda x: max(1, round(x)))
+            
+            # Apply oversubscription for non-prod (simulated broadly here)
+            servers_df["suggested_vcpu"] = (servers_df["suggested_vcpu"] / oversubscription).apply(lambda x: max(1, round(x)))
+        else:
+            servers_df["suggested_vcpu"] = servers_df["vcpu"]
+            servers_df["suggested_ram"] = servers_df["ram_gb"]
+            
+        servers_df["vcpu_wasted"] = (servers_df["vcpu"] - servers_df["suggested_vcpu"]).clip(lower=0)
+        servers_df["potential_monthly_savings"] = servers_df["vcpu_wasted"] * 35.0
         
-        # Calculate dynamic GCP target cost with oversubscription and headroom scaling
+        top_savings = servers_df[servers_df["vcpu_wasted"] > 0].sort_values("potential_monthly_savings", ascending=False).head(5)
+        
+        # Base GCP Cost calculations
         base_gcp_cost = target_df["estimated_monthly_cost"].sum()
         
-        # Scale based on What-If parameters (normalized to base settings of 2.0 oversubscription and 20% headroom)
-        vcpu_savings_multiplier = 2.0 / oversubscription
-        headroom_multiplier = (100.0 + headroom) / 120.0
-        
-        optimized_gcp_cost = base_gcp_cost * vcpu_savings_multiplier * headroom_multiplier
-        lift_and_shift_cost = base_gcp_cost * 1.55 * headroom_multiplier
+        # Dynamic GCP target cost based on selected mode
+        if sizing_mode == "AI Right-Sizing (Optimized)":
+            total_original_vcpu = max(1, servers_df["vcpu"].sum())
+            total_suggested_vcpu = max(1, servers_df["suggested_vcpu"].sum())
+            ratio = total_suggested_vcpu / total_original_vcpu
+            optimized_gcp_cost = base_gcp_cost * ratio
+        else:
+            optimized_gcp_cost = base_gcp_cost * 1.55 # Simulate unoptimized 1:1 footprint cost
+            
+        lift_and_shift_cost = base_gcp_cost * 1.55
         
         annual_savings = (on_prem_cost - optimized_gcp_cost) * 12
         savings_percentage = ((on_prem_cost - optimized_gcp_cost) / on_prem_cost) * 100
@@ -105,30 +143,36 @@ def render():
         
         breakdown_df = target_df.groupby("target_gcp_service")["estimated_monthly_cost"].sum().reset_index()
         breakdown_df["Resource Type"] = breakdown_df["target_gcp_service"].map(lambda x: service_mapping.get(x, f"GCP Service: {x}"))
-        breakdown_df["Estimated Cost ($)"] = breakdown_df["estimated_monthly_cost"] * vcpu_savings_multiplier * headroom_multiplier
+        
+        multiplier = (optimized_gcp_cost / base_gcp_cost) if base_gcp_cost > 0 else 1.0
+        breakdown_df["Estimated Cost ($)"] = breakdown_df["estimated_monthly_cost"] * multiplier
         
     else:
         # Fallback to standard mock metrics if tables are empty/missing
         on_prem_cost = 175000.0
         base_gcp_cost = 74160.0
         
-        vcpu_savings_multiplier = 2.0 / oversubscription
-        headroom_multiplier = (100.0 + headroom) / 120.0
-        
-        optimized_gcp_cost = base_gcp_cost * vcpu_savings_multiplier * headroom_multiplier
-        lift_and_shift_cost = base_gcp_cost * 1.55 * headroom_multiplier
+        if sizing_mode == "AI Right-Sizing (Optimized)":
+            vcpu_savings_multiplier = 2.0 / oversubscription
+            headroom_multiplier = (100.0 + headroom) / 120.0
+            optimized_gcp_cost = base_gcp_cost * vcpu_savings_multiplier * headroom_multiplier
+        else:
+            optimized_gcp_cost = base_gcp_cost * 1.55
+            
+        lift_and_shift_cost = base_gcp_cost * 1.55
         annual_savings = (on_prem_cost - optimized_gcp_cost) * 12
         savings_percentage = ((on_prem_cost - optimized_gcp_cost) / on_prem_cost) * 100
         
+        multiplier = optimized_gcp_cost / base_gcp_cost
         breakdown_df = pd.DataFrame({
             "Resource Type": ["Compute Engine (VMs)", "GKE (Autopilot)", "Cloud SQL (Managed DB)", "Bare Metal Solution (Oracle)", "Storage & Networking", "Operations"],
             "Estimated Cost ($)": [
-                12800 * vcpu_savings_multiplier * headroom_multiplier,
-                18500 * vcpu_savings_multiplier * headroom_multiplier,
-                7800 * vcpu_savings_multiplier * headroom_multiplier,
-                24000 * vcpu_savings_multiplier * headroom_multiplier,
-                6800 * vcpu_savings_multiplier * headroom_multiplier,
-                4260 * vcpu_savings_multiplier * headroom_multiplier
+                12800 * multiplier,
+                18500 * multiplier,
+                7800 * multiplier,
+                24000 * multiplier,
+                6800 * multiplier,
+                4260 * multiplier
             ]
         })
         
@@ -138,7 +182,7 @@ def render():
     with col1:
         st.metric("Current On-Prem Cost", f"${on_prem_cost:,.2f} / mo", delta="Depreciation + Ops")
     with col2:
-        st.metric("Optimized Target Cost", f"${optimized_gcp_cost:,.2f} / mo", delta=f"-{savings_percentage:.1f}% Cost Reduction", delta_color="inverse")
+        st.metric("Target Cost (" + ("Optimized" if sizing_mode.startswith("AI") else "1:1") + ")", f"${optimized_gcp_cost:,.2f} / mo", delta=f"-{savings_percentage:.1f}% Cost Reduction", delta_color="inverse")
     with col3:
         st.metric("Projected Annual Savings", f"${annual_savings:,.2f} / yr", delta="Reinvestable Capital")
         
@@ -151,7 +195,7 @@ def render():
         st.subheader("Monthly Cost Comparison")
         df_cost = pd.DataFrame({
             "Platform": ["On-Premises", "Target (Lift & Shift)", "Target (Optimized)"],
-            "Monthly Cost ($)": [on_prem_cost, lift_and_shift_cost, optimized_gcp_cost],
+            "Monthly Cost ($)": [on_prem_cost, lift_and_shift_cost, optimized_gcp_cost if sizing_mode.startswith("AI") else lift_and_shift_cost],
             "Type": ["Current", "Lift & Shift", "D.A.M.I. Optimized"]
         })
         fig = px.bar(
@@ -178,6 +222,34 @@ def render():
         st.plotly_chart(fig_pie, use_container_width=True)
         
     st.write("---")
+    
+    # Server Rightsizing Detail (New for F7)
+    if sizing_mode == "AI Right-Sizing (Optimized)" and top_savings is not None and not top_savings.empty:
+        st.subheader("🎯 Top Right-Sizing Opportunities")
+        st.write("The FinOps AI agent identified these servers as significantly over-provisioned on-prem. Moving to GCP with optimized shapes yields immediate savings.")
+        
+        display_df = top_savings[["name", "vcpu", "cpu_utilization_avg", "suggested_vcpu", "potential_monthly_savings"]].copy()
+        display_df.rename(columns={
+            "name": "Server Name",
+            "vcpu": "On-Prem Cores",
+            "cpu_utilization_avg": "Avg CPU Util (%)",
+            "suggested_vcpu": "Recommended GCP vCPUs",
+            "potential_monthly_savings": "Monthly Savings ($)"
+        }, inplace=True)
+        
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Avg CPU Util (%)": st.column_config.ProgressColumn("Avg CPU Util (%)", min_value=0, max_value=100, format="%.1f%%"),
+                "Monthly Savings ($)": st.column_config.NumberColumn("Monthly Savings ($)", format="$%.2f")
+            }
+        )
+        
+        st.info(f"💡 Right-sizing just these top {len(top_savings)} servers saves **${display_df['Monthly Savings ($)'].sum()*12:,.2f} annually**.")
+        st.write("---")
+
     
     # Optimization Drivers List
     st.subheader("💸 D.A.M.I. Cost Optimization Drivers")
@@ -225,7 +297,7 @@ def render():
         scenario_total = scenario_db_cost + scenario_compute_cost + scenario_other
         
         scenario_savings = on_prem_cost - scenario_total
-        scenario_pct = (scenario_savings / on_prem_cost) * 100
+        scenario_pct = (scenario_savings / max(on_prem_cost, 1)) * 100
         
         # Display comparison
         st.write("")

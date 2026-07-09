@@ -297,8 +297,10 @@ def main():
         "🔑 License Risk",
         "✅ Validation",
         "🧭 Migration Advisor",
+        "💻 Code Refactoring",
         "🚀 Cutover Simulation",
         "🔌 Integrations",
+        "🤝 Stakeholder Comm",
         "🔍 Agent Trace",
         "🧠 Self-Learning",
         "💬 Conversational Assistant"
@@ -347,12 +349,18 @@ def main():
         elif selection == "🧭 Migration Advisor":
             from ui.pages import migration_advisor
             migration_advisor.render()
+        elif selection == "💻 Code Refactoring":
+            from ui.pages import code_migration
+            code_migration.render()
         elif selection == "🚀 Cutover Simulation":
             from ui.pages import cutover
             cutover.render()
         elif selection == "🔌 Integrations":
             from ui.pages import integrations
             integrations.render()
+        elif selection == "🤝 Stakeholder Comm":
+            from ui.pages import stakeholders
+            stakeholders.render()
         elif selection == "🔍 Agent Trace":
             from ui.pages import agent_trace
             agent_trace.render()

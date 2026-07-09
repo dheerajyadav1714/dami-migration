@@ -33,7 +33,7 @@ class TraceLogger:
 
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         self.table_id = f"{self.project_id}.{self.dataset}.agent_execution_logs"
         try:
             self.client = bigquery.Client(project=self.project_id)

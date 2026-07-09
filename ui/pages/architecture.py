@@ -301,7 +301,7 @@ def draw_graphviz_diagram(target_cloud, df_mappings):
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     client = get_bq_client(project_id)
     
     st.markdown("<h1 class='gradient-text'>Target Architecture & Mapping</h1>", unsafe_allow_html=True)
@@ -337,7 +337,7 @@ def render():
     # Fetch mappings BEFORE tabs so both diagram and table can use them
     df_mappings = get_mappings(client, project_id, dataset)
     
-    tab1, tab2, tab3 = st.tabs(["🗺️ Visual Topology Diagram", "🤖 AI-Generated Architecture (Gemini)", "🔍 Component Mapping Table"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🗺️ Visual Topology Diagram", "🤖 AI-Generated Architecture (Gemini)", "🔍 Component Mapping Table", "🎨 Eraser.io Style (Mermaid)"])
     
     with tab1:
         st.write(" ")
@@ -451,6 +451,72 @@ def render():
         - **Serverless Conversion:** Replaced RabbitMQ VM with a fully managed Cloud messaging queue (Zero-maintenance serverless).
         - **Managed Databases:** Replaced 1 self-managed MySQL VM with Managed Database engines (includes HA & automatic backups).
         """)
+
+    with tab4:
+        st.write(" ")
+        st.subheader("🎨 Diagram-as-Code (Eraser.io Style)")
+        st.caption("Generate a professional, rendered architecture diagram using Mermaid.js and Gemini.")
+        
+        if st.button("✨ Generate Visual Diagram"):
+            with st.spinner("Gemini is generating Mermaid.js diagram code..."):
+                import json
+                from google.genai import Client
+                from google.genai import types
+                
+                # Setup Gemini Client
+                api_key = os.getenv("GEMINI_API_KEY")
+                if api_key:
+                    genai_client = Client(api_key=api_key)
+                    model_name = "gemini-2.5-pro"
+                else:
+                    genai_client = Client(enterprise=True)
+                    model_name = f"projects/{os.getenv('VERTEX_PROJECT_ID', 'gcp-experiments-490315')}/locations/{os.getenv('VERTEX_AI_LOCATION', 'us-central1')}/publishers/google/models/gemini-2.5-pro"
+                
+                prompt = f"""
+                You are a Cloud Architecture expert.
+                Based on the following target architecture mapping, generate a valid Mermaid.js flowchart (graph TD) representing the final {target_cloud} architecture.
+                Group the components logically (e.g., using subgraphs for Web Tier, App Tier, Data Tier).
+                Only output the raw Mermaid code block (start with 'graph TD' or 'architecture'). Do not use markdown backticks (```mermaid).
+
+                Data:
+                {json.dumps(df_mappings[['source_component_id', 'target_gcp_service', 'target_resource_name']].to_dict('records'))}
+                """
+                
+                try:
+                    response = genai_client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(temperature=0.2)
+                    )
+                    mermaid_code = response.text.replace('```mermaid', '').replace('```', '').strip()
+                    st.session_state["mermaid_code"] = mermaid_code
+                    st.success("Diagram generated!")
+                except Exception as e:
+                    st.error(f"Failed to generate diagram: {e}")
+                    
+        if "mermaid_code" in st.session_state:
+            mermaid_code = st.session_state["mermaid_code"]
+            st.code(mermaid_code, language="mermaid")
+            
+            # Render using HTML injection
+            import streamlit.components.v1 as components
+            html_code = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <script type="module">
+                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
+              </script>
+            </head>
+            <body style="background-color: transparent;">
+              <pre class="mermaid" style="text-align: center;">
+                {mermaid_code}
+              </pre>
+            </body>
+            </html>
+            """
+            components.html(html_code, height=600, scrolling=True)
 
 if __name__ == "__main__":
     render()

@@ -15,7 +15,7 @@ load_dotenv()
 class ReportGeneratorAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
 
     def generate_executive_report(self) -> str:
         """

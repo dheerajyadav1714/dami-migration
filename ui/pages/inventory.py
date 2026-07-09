@@ -56,7 +56,7 @@ def get_servers_data(project_id, dataset):
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     st.markdown("<h1 class='gradient-text'>Discovered Server Inventory</h1>", unsafe_allow_html=True)
     st.write("Browse and filter the complete catalog of discovered servers in your on-premises environment.")

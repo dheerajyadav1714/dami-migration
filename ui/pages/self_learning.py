@@ -22,7 +22,7 @@ def render():
     st.write("D.A.M.I. learns from every human correction and migration outcome to improve future decisions.")
     
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     # --- Backend Status ---
     status_col1, status_col2 = st.columns(2)

@@ -150,7 +150,7 @@ class ValidationAgent:
     
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID", "cohort-2-497207")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         self.client = bigquery.Client(project=self.project_id)
     
     def generate_wave_checklists(self) -> list:

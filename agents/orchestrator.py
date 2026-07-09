@@ -274,7 +274,7 @@ def process_feedback(feedback_text: str, affected_component: str = "risk_scores"
         from google.cloud import bigquery
         import uuid
         client = bigquery.Client(project=os.getenv("GCP_PROJECT_ID"))
-        dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         table_id = f"{os.getenv('GCP_PROJECT_ID')}.{dataset}.feedback"
         
         feedback_row = {

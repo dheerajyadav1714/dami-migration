@@ -68,7 +68,7 @@ def read_local_file(wave_number, file_type, target_cloud="Google Cloud Platform 
     if bq_artifact_type:
         try:
             project_id = os.getenv("GCP_PROJECT_ID")
-            dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+            dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
             client = bigquery.Client(project=project_id)
             wave_id = f"wav-{wave_number:04d}"
             query = f"""
@@ -90,7 +90,7 @@ def read_local_file(wave_number, file_type, target_cloud="Google Cloud Platform 
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     client = get_bq_client(project_id)
     
     st.markdown("<h1 class='gradient-text'>Infrastructure as Code & Migration Runbooks</h1>", unsafe_allow_html=True)
@@ -261,10 +261,29 @@ resource "google_compute_instance" "dev_test_vm_01" {
             k8s_code = ""
             runbook_md = "### Runbook for this wave is pending. Click 'Generate Wave Artifacts' above."
 
-    tab_runbook, tab_tf, tab_docker, tab_k8s, tab_ansible, tab_cicd, tab_monitoring = st.tabs([
-        "📖 Runbook", "🚀 Terraform HCL", "🐳 Dockerfile", "☸️ Kubernetes YAML", 
+    tab_runbook, tab_lz, tab_tf, tab_docker, tab_k8s, tab_ansible, tab_cicd, tab_monitoring = st.tabs([
+        "📖 Runbook", "🏗️ Foundation/LZ", "🚀 Workload IaC", "🐳 Dockerfile", "☸️ Kubernetes YAML", 
         "🤖 Ansible Playbook", "🔄 CI/CD Pipeline", "📊 Monitoring"
     ])
+    
+    with tab_lz:
+        st.write(" ")
+        st.subheader(f"Landing Zone Foundation ({target_cloud})")
+        st.caption("Generate complete VPCs, Subnets, and Firewalls matching your parsed inventory environments.")
+        
+        from agents.terraform_agent import TerraformAgent
+        tf_agent = TerraformAgent()
+        zip_data = tf_agent.generate_landing_zone_zip(target_cloud)
+        
+        st.success("✅ Landing Zone Terraform codebase is ready for download.")
+        st.download_button(
+            label="💾 Download LandingZone.zip",
+            data=zip_data,
+            file_name=f"landing_zone_{target_cloud.split(' ')[0].lower()}.zip",
+            mime="application/zip",
+            key="dl_lz_zip_btn",
+            use_container_width=True
+        )
     
     with tab_tf:
         st.write(" ")

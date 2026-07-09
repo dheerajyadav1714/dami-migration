@@ -46,7 +46,7 @@ def get_apps_list(project_id, dataset):
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     st.markdown("<h1 class='gradient-text'>Workload Dependency Map</h1>", unsafe_allow_html=True)
     st.write("Visualize directed dependencies and communication flows between applications and shared services.")

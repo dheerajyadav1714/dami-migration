@@ -63,7 +63,7 @@ def render():
     st.write("---")
 
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     client = get_bq_client(project_id)
 
     # Fetch available runs

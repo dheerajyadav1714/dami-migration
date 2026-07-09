@@ -17,7 +17,7 @@ def get_bq_client(project_id):
 
 def get_bq_context():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     client = get_bq_client(project_id)
     
     context = {
@@ -98,7 +98,7 @@ def _get_session_id():
 def _save_chat_to_bq(messages: list):
     """Save the current chat history to BigQuery for persistence."""
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     session_id = _get_session_id()
     
     try:
@@ -146,7 +146,7 @@ def _save_chat_to_bq(messages: list):
 def _load_chat_from_bq() -> list:
     """Load chat session from BigQuery. Falls back to most recent session ONLY if no session ID was in URL."""
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     session_id = _get_session_id()
     
     try:
@@ -236,7 +236,7 @@ def classify_complexity(query: str) -> tuple:
 def get_orchestrator_response(query):
     """Route queries through the appropriate Gemini model based on complexity."""
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     # Intercept Confluence spec updates
     if "confluence" in query.lower() and ("read" in query.lower() or "update" in query.lower() or "sync" in query.lower()):
@@ -455,7 +455,7 @@ def render():
             try:
                 session_id = _get_session_id()
                 bq_project = os.getenv("GCP_PROJECT_ID")
-                bq_dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+                bq_dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
                 client = bigquery.Client(project=bq_project)
                 client.query(f"DELETE FROM `{bq_project}.{bq_dataset}.chat_history` WHERE session_id = '{session_id}'").result()
             except Exception:

@@ -15,7 +15,7 @@ from data.seed.generate_seed_data import generate_rvtools_csv, generate_dependen
 def load_env_vars():
     load_dotenv()
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     if not project_id:
         print("Error: GCP_PROJECT_ID not set in .env")
         sys.exit(1)

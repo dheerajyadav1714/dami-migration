@@ -112,3 +112,4 @@ watchdog==6.0.0
 wcwidth==0.8.1
 websockets==15.0.1
 fpdf2==2.8.4
+tabulate

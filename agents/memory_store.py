@@ -40,7 +40,7 @@ class MemoryStore:
     
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         self.bq_client = bigquery.Client(project=self.project_id)
         self.alloydb_available = False
         

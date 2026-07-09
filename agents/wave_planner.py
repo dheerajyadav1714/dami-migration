@@ -11,7 +11,7 @@ load_dotenv()
 class WavePlannerAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         self._init_gemini()
     

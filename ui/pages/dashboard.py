@@ -50,7 +50,7 @@ def get_project_stats(project_id, dataset):
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     # Fetch stats
     stats = get_project_stats(project_id, dataset)

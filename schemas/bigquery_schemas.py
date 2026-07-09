@@ -1,7 +1,7 @@
 # bigquery_schemas.py
 # Define all table creation statements for the D.A.M.I. migration intelligence platform.
 
-DATASET_NAME = "dami_data"
+DATASET_NAME = "dami_v3"
 
 TABLES_SQL = {
     # DOMAIN 1: INVENTORY

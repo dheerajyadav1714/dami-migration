@@ -20,7 +20,7 @@ class WaveArtifactsResponse(BaseModel):
 class ArtifactsGeneratorAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         self.location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
         self.model_name = "gemini-2.5-pro"
         

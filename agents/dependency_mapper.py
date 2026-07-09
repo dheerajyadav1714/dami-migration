@@ -9,7 +9,7 @@ load_dotenv()
 class DependencyMapperAgent:
     def __init__(self):
         self.project_id = os.getenv("GCP_PROJECT_ID")
-        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+        self.dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
         
     def build_graph(self) -> nx.DiGraph:
         """

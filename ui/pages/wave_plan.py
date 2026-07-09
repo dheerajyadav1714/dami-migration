@@ -64,7 +64,7 @@ def get_bq_client(project_id):
 
 def render():
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset = os.getenv("BIGQUERY_DATASET", "dami_data")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     st.markdown("<h1 class='gradient-text'>Migration Wave Planning</h1>", unsafe_allow_html=True)
     st.write("Examine the sequenced migration waves scheduled topologically to prevent downtime and dependency breaks.")

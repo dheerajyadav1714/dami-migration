@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Calendar, AlertTriangle, CheckCircle2, XCircle, Clock, Plus, Trash2, Shield } from 'lucide-react';
 
@@ -27,7 +28,7 @@ export default function BlackoutCalendar() {
   const [newBlackout, setNewBlackout] = useState({ name: '', date: '' });
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/waves')
+    api.get('/api/waves')
       .then(res => setWaves(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

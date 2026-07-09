@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { 
   Plus, 
@@ -44,8 +45,8 @@ export default function IngestionCenter() {
     const fetchData = async () => {
       try {
         const [qualRes, hygRes] = await Promise.all([
-          axios.get('http://localhost:8000/api/ingestion/quality').catch(() => ({data: {}})),
-          axios.get('http://localhost:8000/api/ingestion/zombies').catch(() => ({data: {zombies: [], ip_conflicts: []}}))
+          api.get('/api/ingestion/quality').catch(() => ({data: {}})),
+          api.get('/api/ingestion/zombies').catch(() => ({data: {zombies: [], ip_conflicts: []}}))
         ]);
         
         if (qualRes.data.overall_score !== undefined) setQuality(qualRes.data);
@@ -63,7 +64,7 @@ export default function IngestionCenter() {
   const runPipeline = async () => {
     alert("Full Migration Pipeline (ASSESS -> PLAN) triggered successfully!");
     try {
-      await axios.post('http://localhost:8000/api/run-agent', { project_id: 'proj-migration-001', phase: 'assess_and_plan' });
+      await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'assess_and_plan' });
     } catch(e) {}
   };
 

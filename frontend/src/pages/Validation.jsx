@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { CheckSquare, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 
@@ -39,11 +40,11 @@ export default function Validation() {
     setRefreshing(true);
     
     Promise.all([
-      axios.get('http://localhost:8000/api/project/stats').catch(() => ({ data: {} })),
-      axios.get('http://localhost:8000/api/inventory/servers').catch(() => ({ data: [] })),
-      axios.get('http://localhost:8000/api/risk/scores').catch(() => ({ data: [] })),
-      axios.get('http://localhost:8000/api/waves').catch(() => ({ data: [] })),
-      axios.get('http://localhost:8000/api/dependencies').catch(() => ({ data: [] })),
+      api.get('/api/project/stats').catch(() => ({ data: {} })),
+      api.get('/api/inventory/servers').catch(() => ({ data: [] })),
+      api.get('/api/risk/scores').catch(() => ({ data: [] })),
+      api.get('/api/waves').catch(() => ({ data: [] })),
+      api.get('/api/dependencies').catch(() => ({ data: [] })),
     ]).then(([statsRes, serversRes, riskRes, wavesRes, depsRes]) => {
       const s = statsRes.data;
       const servers = serversRes.data || [];

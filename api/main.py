@@ -729,7 +729,35 @@ async def store_learning_feedback(req: FeedbackRequest):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+# Health check endpoint for Cloud Run
+@app.get("/api/health")
+async def health_check():
+    return {"status": "healthy", "service": "dami-v3"}
+
+# ============================================================
+# PRODUCTION: Serve React static files + SPA fallback
+# ============================================================
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
+
+if os.path.isdir(FRONTEND_DIR):
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    # Serve static assets (JS, CSS, images)
+    assets_dir = os.path.join(FRONTEND_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="static-assets")
+
+    # SPA fallback: serve index.html for all non-API routes
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # If the file exists in dist/, serve it (e.g., favicon, manifest)
+        file_path = os.path.join(FRONTEND_DIR, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # Otherwise serve index.html for client-side routing
+        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-

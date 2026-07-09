@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Network, ArrowRight, Cloud, Server, Database, Cpu, Bot, Loader2 } from 'lucide-react';
 
@@ -55,7 +56,7 @@ export default function TargetArchitecture() {
   const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/inventory/servers')
+    api.get('/api/inventory/servers')
       .then(res => setServers(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -78,7 +79,7 @@ export default function TargetArchitecture() {
     setAiLoading(true);
     try {
       const serverSummary = mappings.slice(0, 10).map(m => `${m.name} (${m.workload_type}) → ${m.gcp}`).join(', ');
-      const res = await axios.post('http://localhost:8000/api/chat', { prompt: `Generate a detailed GCP target architecture recommendation for migrating these on-premises servers: ${serverSummary}. Include: VPC design, network topology, security zones, managed services selection rationale, and high-availability configuration. Format as a professional architecture document.` });
+      const res = await api.post('/api/chat', { prompt: `Generate a detailed GCP target architecture recommendation for migrating these on-premises servers: ${serverSummary}. Include: VPC design, network topology, security zones, managed services selection rationale, and high-availability configuration. Format as a professional architecture document.` });
       setAiArch(res.data?.reply || 'Failed to generate architecture.');
     } catch {
       setAiArch('Failed to generate. Ensure backend is running.');

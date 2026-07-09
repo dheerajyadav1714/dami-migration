@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { 
   Download, 
@@ -69,11 +70,11 @@ export default function ExecutiveDashboard() {
     const fetchData = async () => {
       try {
         const [statsRes, readinessRes, benchRes, velRes, actRes] = await Promise.all([
-          axios.get('http://localhost:8000/api/project/stats').catch(() => ({data: {}})),
-          axios.get('http://localhost:8000/api/project/readiness').catch(() => ({data: {overall_score: 0, dimension_scores: {}}})),
-          axios.get('http://localhost:8000/api/project/benchmarks').catch(() => ({data: {has_real_benchmarks: false, real_benchmarks: [], simulated_benchmarks: []}})),
-          axios.get('http://localhost:8000/api/charts/migration-velocity').catch(() => ({data: []})),
-          axios.get('http://localhost:8000/api/project/activity').catch(() => ({data: []}))
+          api.get('/api/project/stats').catch(() => ({data: {}})),
+          api.get('/api/project/readiness').catch(() => ({data: {overall_score: 0, dimension_scores: {}}})),
+          api.get('/api/project/benchmarks').catch(() => ({data: {has_real_benchmarks: false, real_benchmarks: [], simulated_benchmarks: []}})),
+          api.get('/api/charts/migration-velocity').catch(() => ({data: []})),
+          api.get('/api/project/activity').catch(() => ({data: []}))
         ]);
         
         if (statsRes.data.total_servers !== undefined) setStats(statsRes.data);
@@ -98,7 +99,7 @@ export default function ExecutiveDashboard() {
     setOrchestratorLoading(true);
     setOrchestratorResponse(null);
     try {
-      const res = await axios.post('http://localhost:8000/api/run-orchestrator', { prompt: orchestratorPrompt });
+      const res = await api.post('/api/run-orchestrator', { prompt: orchestratorPrompt });
       setOrchestratorResponse({ success: true, text: res.data.final_response || "Command executed successfully.", tools: res.data.triggered_tools || [] });
     } catch (err) {
       setOrchestratorResponse({ success: false, text: "Orchestrator unavailable or failed to execute." });
@@ -109,7 +110,7 @@ export default function ExecutiveDashboard() {
 
   const runAgent = async (phase) => {
     try {
-      await axios.post('http://localhost:8000/api/run-agent', { project_id: 'proj-migration-001', phase });
+      await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase });
       alert(`Triggered ${phase} agent successfully!`);
     } catch(e) {
       alert(`Failed to trigger ${phase} agent.`);
@@ -141,7 +142,7 @@ export default function ExecutiveDashboard() {
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg font-semibold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-2 text-sm"
                   onClick={async () => {
                     try {
-                      const res = await axios.post('http://localhost:8000/api/chat', { prompt: `Generate a comprehensive executive migration report for project "${stats.name}" for client "${stats.client_name}". Include: ${stats.total_servers} servers discovered, ${stats.total_waves} migration waves planned, estimated annual savings of $${stats.savings_val}, current phase: ${stats.phase}. Format as a professional executive summary with sections for Overview, Key Metrics, Risk Assessment, Wave Plan Summary, Cost Analysis, and Next Steps.` });
+                      const res = await api.post('/api/chat', { prompt: `Generate a comprehensive executive migration report for project "${stats.name}" for client "${stats.client_name}". Include: ${stats.total_servers} servers discovered, ${stats.total_waves} migration waves planned, estimated annual savings of $${stats.savings_val}, current phase: ${stats.phase}. Format as a professional executive summary with sections for Overview, Key Metrics, Risk Assessment, Wave Plan Summary, Cost Analysis, and Next Steps.` });
                       const report = res.data?.reply || 'Report generation failed.';
                       const blob = new Blob([report], {type: 'text/markdown'});
                       const a = document.createElement('a');
@@ -444,7 +445,7 @@ export default function ExecutiveDashboard() {
               <h3 className="text-lg font-bold text-white flex items-center gap-2"><Zap className="text-emerald-400 w-5 h-5" /> NVIDIA RAPIDS Performance Metrics</h3>
               <div className="flex items-center gap-3">
                 <button 
-                  onClick={() => { axios.get('http://localhost:8000/api/project/benchmarks').then(r => setBenchmarks(r.data)).catch(()=>{}); }}
+                  onClick={() => { api.get('/api/project/benchmarks').then(r => setBenchmarks(r.data)).catch(()=>{}); }}
                   className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/40 transition-all font-semibold"
                 >
                   ↻ Refresh Results

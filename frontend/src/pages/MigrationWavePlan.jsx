@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Layers, Clock, Server, ChevronDown, ChevronRight } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, PieChart, Pie } from 'recharts';
@@ -12,7 +13,7 @@ export default function MigrationWavePlan() {
   const [expandedWaves, setExpandedWaves] = useState({});
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/waves')
+    api.get('/api/waves')
       .then(res => setWaves(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

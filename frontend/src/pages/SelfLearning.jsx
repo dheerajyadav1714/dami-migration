@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { BrainCircuit, TrendingUp, Lightbulb, Zap, RefreshCw, MessageSquare, Send, Loader2, BookOpen, CheckCircle2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, PieChart, Pie } from 'recharts';
@@ -18,8 +19,8 @@ export default function SelfLearning() {
   const fetchData = () => {
     setLoading(true);
     Promise.all([
-      axios.get('http://localhost:8000/api/learning/stats').catch(() => ({ data: {} })),
-      axios.get('http://localhost:8000/api/learning/memories').catch(() => ({ data: [] })),
+      api.get('/api/learning/stats').catch(() => ({ data: {} })),
+      api.get('/api/learning/memories').catch(() => ({ data: [] })),
     ]).then(([sRes, mRes]) => {
       setStats(sRes.data || {});
       setMemories(mRes.data || []);
@@ -32,7 +33,7 @@ export default function SelfLearning() {
     if (!feedback.corrected_output.trim()) return;
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:8000/api/learning/feedback', {
+      await api.post('/api/learning/feedback', {
         agent_name: feedback.agent_name,
         learning_type: feedback.learning_type,
         context: {},

@@ -1,24 +1,34 @@
+# Node modules (built in Docker)
+frontend/node_modules/
+frontend/dist/
+
+# Python
 .venv/
 venv/
 __pycache__/
 *.pyc
+*.pyo
+
+# Git
 .git/
 .gitignore
-.env
+
+# IDE
+.vscode/
+.idea/
 .gemini/
-feedback.txt
-task.md
-implementation_plan.md
-COMPLETE_SYSTEM_GUIDE.md
-PITCH_DECK_OUTLINE.md
-DEMO_VIDEO_SCRIPT.md
-generated_assets/
-*.log
+.agents/
+
+# Dev files
+docs/
+mockups/
+notebooks/
 *.md
 !README.md
-!SUBMISSION_SUMMARY.md
-data/seed/__pycache__/
-data/seed/graph.html
 test_*.py
-run.bat
-seed.bat
+*.log
+Feedback.txt
+
+# OS
+.DS_Store
+Thumbs.db

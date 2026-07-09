@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Users, Mail, FileText, Download, Send, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export default function StakeholderComm() {
   const generateReport = async (template, index) => {
     setGenerating(index);
     try {
-      const res = await axios.post('http://localhost:8000/api/chat', { prompt: template.prompt });
+      const res = await api.post('/api/chat', { prompt: template.prompt });
       const reportContent = res.data?.reply || 'Report generation failed.';
       setGeneratedReports(prev => ({ ...prev, [index]: reportContent }));
       

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { MessageSquare, Send, Bot, User, Sparkles } from 'lucide-react';
 
@@ -24,7 +25,7 @@ export default function MigrationAdvisor() {
     setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:8000/api/chat', { prompt: text.trim() });
+      const res = await api.post('/api/chat', { prompt: text.trim() });
       setMessages(prev => [...prev, { role: 'assistant', text: res.data?.reply || 'No response received.' }]);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, I encountered an error. Please ensure the backend is running.' }]);

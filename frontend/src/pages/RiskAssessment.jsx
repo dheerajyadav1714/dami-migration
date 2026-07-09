@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { AlertTriangle, ShieldAlert, Target, ArrowRightLeft, Trash2 } from 'lucide-react';
 import {
@@ -15,7 +16,7 @@ export default function RiskAssessment() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/risk/scores')
+    api.get('/api/risk/scores')
       .then(res => setRisks(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

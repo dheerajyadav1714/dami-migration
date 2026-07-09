@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Shield, CheckCircle2, XCircle, AlertTriangle, Cpu, HardDrive, Network, Cloud, RefreshCw } from 'lucide-react';
 
@@ -18,8 +19,8 @@ export default function QuotaPreChecker() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('http://localhost:8000/api/waves').catch(() => ({ data: [] })),
-      axios.get('http://localhost:8000/api/inventory/servers').catch(() => ({ data: [] })),
+      api.get('/api/waves').catch(() => ({ data: [] })),
+      api.get('/api/inventory/servers').catch(() => ({ data: [] })),
     ]).then(([wRes, sRes]) => {
       setWaves(wRes.data || []);
       setServers(sRes.data || []);

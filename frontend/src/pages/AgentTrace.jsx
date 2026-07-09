@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Activity, ChevronDown, ChevronRight, CheckCircle2, Clock, AlertTriangle, Bot, Cpu, Database, Shield, RefreshCw } from 'lucide-react';
 
@@ -67,7 +68,7 @@ export default function AgentTrace() {
 
   const loadTraces = () => {
     setLoading(true);
-    axios.get('http://localhost:8000/api/agent/traces')
+    api.get('/api/agent/traces')
       .then(res => {
         if (res.data && res.data.length > 0) {
           const converted = res.data.map(t => ({

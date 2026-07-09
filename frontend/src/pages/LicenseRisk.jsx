@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Key, AlertTriangle, Clock, ShieldCheck } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, PieChart, Pie } from 'recharts';
@@ -22,7 +23,7 @@ export default function LicenseRisk() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/inventory/servers')
+    api.get('/api/inventory/servers')
       .then(res => setServers(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

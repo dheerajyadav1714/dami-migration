@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { 
   ServerCog, Cpu, MemoryStick, Database, Search, Plus, Filter, ArrowDownUp 
@@ -27,7 +28,7 @@ export default function ServerInventory() {
   useEffect(() => {
     const fetchServers = async () => {
       try {
-        const res = await axios.get('http://localhost:8000/api/inventory/servers');
+        const res = await api.get('/api/inventory/servers');
         setServers(res.data || []);
       } catch (error) {
         console.error("Error fetching servers:", error);

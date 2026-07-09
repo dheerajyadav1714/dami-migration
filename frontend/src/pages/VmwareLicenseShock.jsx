@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { DollarSign, AlertTriangle, TrendingDown, Clock, Server, Cloud, Download, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, AreaChart, Area } from 'recharts';
@@ -10,7 +11,7 @@ export default function VmwareLicenseShock() {
   const [coresPerHost, setCoresPerHost] = useState(32);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/inventory/servers')
+    api.get('/api/inventory/servers')
       .then(res => setServers(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

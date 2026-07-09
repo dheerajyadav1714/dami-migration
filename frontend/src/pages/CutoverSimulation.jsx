@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Zap, Clock, CheckCircle2, AlertTriangle, Play, Server } from 'lucide-react';
 
@@ -13,7 +14,7 @@ export default function CutoverSimulation() {
   const [selectedWave, setSelectedWave] = useState('all');
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/waves')
+    api.get('/api/waves')
       .then(res => setWaves(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

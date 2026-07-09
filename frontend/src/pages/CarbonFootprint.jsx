@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Leaf, Factory, Car, TreePine, Zap, Download, Globe2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, PieChart, Pie } from 'recharts';
@@ -19,7 +20,7 @@ export default function CarbonFootprint() {
   const [onPremPUE, setOnPremPUE] = useState(1.8);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/inventory/servers')
+    api.get('/api/inventory/servers')
       .then(res => setServers(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

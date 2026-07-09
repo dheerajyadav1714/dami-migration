@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { 
   DollarSign, TrendingDown, TrendingUp, Download, Server, Cloud, ArrowRight, SlidersHorizontal, CalendarDays
@@ -31,7 +32,7 @@ export default function FinopsAndTco() {
   const [whatIfRightsize, setWhatIfRightsize] = useState(20);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/project/stats')
+    api.get('/api/project/stats')
       .then(res => { if (res.data) setStats(res.data); })
       .catch(() => {})
       .finally(() => setLoading(false));

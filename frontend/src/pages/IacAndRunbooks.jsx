@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { 
   FileCode2, BookOpen, PlayCircle, Loader2, Copy, Check, Shield, Cpu
@@ -303,7 +304,7 @@ export default function IacAndRunbooks() {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      await axios.post('http://localhost:8000/api/run-agent', {
+      await api.post('/api/run-agent', {
         project_id: 'proj-migration-001', phase: 'artifacts',
         wave_number: parseInt(selectedWave.charAt(5)) || 1
       });

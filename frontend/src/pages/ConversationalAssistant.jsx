@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Bot, User, Plus, Download, Send, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -23,7 +24,7 @@ export default function ConversationalAssistant() {
 
   useEffect(() => {
     // Fetch dynamic suggestions on mount
-    axios.get('http://localhost:8000/api/chat/suggestions')
+    api.get('/api/chat/suggestions')
       .then(res => setSuggestions(res.data.suggestions || []))
       .catch(err => console.error("Failed to load suggestions", err));
   }, []);
@@ -42,7 +43,7 @@ export default function ConversationalAssistant() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/chat', { prompt: userMessage.content });
+      const response = await api.post('/api/chat', { prompt: userMessage.content });
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'assistant',

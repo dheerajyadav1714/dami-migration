@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Ghost, AlertTriangle, Search, Shield, Wifi, Server, RefreshCw, Loader2, Download } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
@@ -14,8 +15,8 @@ export default function ShadowItDetector() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('http://localhost:8000/api/inventory/servers').catch(() => ({ data: [] })),
-      axios.get('http://localhost:8000/api/dependencies').catch(() => ({ data: [] })),
+      api.get('/api/inventory/servers').catch(() => ({ data: [] })),
+      api.get('/api/dependencies').catch(() => ({ data: [] })),
     ]).then(([sRes, dRes]) => {
       setServers(sRes.data || []);
       setDeps(dRes.data || []);

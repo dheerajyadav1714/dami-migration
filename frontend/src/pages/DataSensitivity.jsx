@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Fingerprint, ShieldAlert, Globe2, Lock, Loader2, Copy, Check, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
@@ -52,7 +53,7 @@ SUMMARY: total PII columns found, overall risk level, and key compliance actions
 
 RESIDENCY_CHECK: Whether this data can legally be stored in the target region, and what conditions apply.`;
 
-      const res = await axios.post('http://localhost:8000/api/chat', { prompt });
+      const res = await api.post('/api/chat', { prompt });
       const reply = res.data?.reply || 'Analysis failed.';
       
       // Parse the response

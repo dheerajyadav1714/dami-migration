@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { 
   Network, Search, Filter, Server, Database, Globe2
@@ -27,7 +28,7 @@ export default function DependencyMap() {
   const [typeFilter, setTypeFilter] = useState('All');
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/dependencies')
+    api.get('/api/dependencies')
       .then(res => setDeps(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../lib/api';
 import axios from 'axios';
 import { Code, Send, Bot, User, Copy, Check } from 'lucide-react';
 
@@ -24,7 +25,7 @@ export default function CodeRefactoring() {
     setLoading(true);
     try {
       const prompt = `You are a cloud migration code refactoring expert. Analyze the following and provide GCP-native refactored code with explanations:\n\n${text.trim()}`;
-      const res = await axios.post('http://localhost:8000/api/chat', { prompt });
+      const res = await api.post('/api/chat', { prompt });
       setMessages(prev => [...prev, { role: 'assistant', text: res.data?.reply || 'No response.' }]);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', text: 'Error contacting the AI agent. Ensure the backend is running.' }]);

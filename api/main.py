@@ -632,6 +632,95 @@ async def get_agent_traces():
             pass
     return traces
 
+@app.get("/api/learning/stats")
+async def get_learning_stats():
+    from google.cloud import bigquery as bq
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
+    try:
+        client = bq.Client(project=project_id)
+        query = f"""
+            SELECT 
+                COUNT(*) as total_memories,
+                COUNTIF(learning_type = 'correction') as corrections,
+                COUNTIF(learning_type = 'pattern') as patterns,
+                COUNTIF(learning_type = 'optimization') as optimizations,
+                COUNTIF(learning_type = 'insight') as insights,
+                ROUND(AVG(effectiveness_score), 3) as avg_effectiveness,
+                SUM(applied_count) as total_applications,
+                COUNT(DISTINCT agent_name) as agents_learning
+            FROM `{project_id}.{dataset}.agent_memories`
+        """
+        df = client.query(query).to_dataframe()
+        if not df.empty:
+            row = df.iloc[0].to_dict()
+            return {k: (float(v) if v is not None else 0) for k, v in row.items()}
+    except Exception as e:
+        print(f"Learning stats error: {e}")
+    return {"total_memories": 0, "corrections": 0, "patterns": 0, "optimizations": 0,
+            "insights": 0, "avg_effectiveness": 0.0, "total_applications": 0, "agents_learning": 0}
+
+@app.get("/api/learning/memories")
+async def get_learning_memories():
+    from google.cloud import bigquery as bq
+    import json as _json
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
+    try:
+        client = bq.Client(project=project_id)
+        query = f"""
+            SELECT memory_id, agent_name, learning_type, context_json,
+                   original_output, corrected_output, confidence_delta,
+                   tags, created_at, applied_count, effectiveness_score
+            FROM `{project_id}.{dataset}.agent_memories`
+            ORDER BY effectiveness_score DESC, created_at DESC
+            LIMIT 50
+        """
+        results = client.query(query).result()
+        records = []
+        for row in results:
+            record = {}
+            for key in row.keys():
+                val = row[key]
+                if val is None:
+                    record[key] = 0 if key in ('applied_count', 'confidence_delta', 'effectiveness_score') else ''
+                elif isinstance(val, (list, tuple)):
+                    record[key] = [str(x) for x in val]
+                elif isinstance(val, (int, float, str, bool)):
+                    record[key] = val
+                else:
+                    record[key] = str(val)
+            records.append(record)
+        return records
+    except Exception as e:
+        print(f"Learning memories error: {e}")
+        import traceback; traceback.print_exc()
+    return []
+
+class FeedbackRequest(BaseModel):
+    agent_name: str
+    learning_type: str = "correction"
+    context: dict = {}
+    original_output: str = ""
+    corrected_output: str = ""
+
+@app.post("/api/learning/feedback")
+async def store_learning_feedback(req: FeedbackRequest):
+    try:
+        from agents.memory_store import MemoryStore
+        store = MemoryStore()
+        memory_id = store.store_learning(
+            agent_name=req.agent_name,
+            learning_type=req.learning_type,
+            context=req.context,
+            original_output=req.original_output,
+            corrected_output=req.corrected_output
+        )
+        return {"status": "success", "memory_id": memory_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

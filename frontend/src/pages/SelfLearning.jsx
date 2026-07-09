@@ -1,84 +1,197 @@
-import React, { useState, useMemo } from 'react';
-import { BrainCircuit, TrendingUp, BookOpen, Lightbulb, BarChart3 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { BrainCircuit, TrendingUp, Lightbulb, Zap, RefreshCw, MessageSquare, Send, Loader2, BookOpen, CheckCircle2 } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, PieChart, Pie } from 'recharts';
 
-const LEARNING_DATA = [
-  { week: 'W1', accuracy: 72, decisions: 15, improvements: 3 },
-  { week: 'W2', accuracy: 78, decisions: 28, improvements: 5 },
-  { week: 'W3', accuracy: 82, decisions: 42, improvements: 7 },
-  { week: 'W4', accuracy: 87, decisions: 61, improvements: 4 },
-  { week: 'W5', accuracy: 89, decisions: 78, improvements: 6 },
-  { week: 'W6', accuracy: 93, decisions: 95, improvements: 3 },
-];
-
-const LEARNINGS = [
-  { title: 'Oracle DB Migration Pattern', desc: 'Learned that Oracle DBs with custom TNS config should use Bare Metal Solution, not Cloud SQL.', category: 'Architecture', confidence: 94, date: '2026-06-15' },
-  { title: 'Windows 2008 R2 EOL Risk', desc: 'Auto-flagged all Windows 2008 R2 servers as critical license risk — confirmed by compliance team.', category: 'Compliance', confidence: 98, date: '2026-06-18' },
-  { title: 'Redis Cache Sizing', desc: 'Learned that Memorystore for Redis requires 2x on-prem memory allocation for optimal performance.', category: 'Sizing', confidence: 89, date: '2026-06-22' },
-  { title: 'Payment App Dependencies', desc: 'Discovered hidden dependency between payment app and LDAP server through network flow analysis.', category: 'Dependencies', confidence: 91, date: '2026-06-25' },
-  { title: 'Wave Sequencing Optimization', desc: 'Learned that migrating load balancers before web servers reduces cutover downtime by 40%.', category: 'Wave Planning', confidence: 86, date: '2026-07-01' },
-];
+const TYPE_COLORS = { correction: '#ef4444', pattern: '#6366f1', optimization: '#10b981', insight: '#f59e0b' };
+const AGENT_NAMES = ['risk_scorer', 'architecture_designer', 'wave_planner', 'iac_generator', 'discovery'];
 
 export default function SelfLearning() {
-  const currentAccuracy = LEARNING_DATA[LEARNING_DATA.length - 1].accuracy;
-  const totalDecisions = LEARNING_DATA.reduce((s, d) => s + d.decisions, 0);
-  const totalImprovements = LEARNING_DATA.reduce((s, d) => s + d.improvements, 0);
+  const [stats, setStats] = useState(null);
+  const [memories, setMemories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [feedback, setFeedback] = useState({ agent_name: 'risk_scorer', learning_type: 'correction', original_output: '', corrected_output: '' });
+
+  const fetchData = () => {
+    setLoading(true);
+    Promise.all([
+      axios.get('http://localhost:8000/api/learning/stats').catch(() => ({ data: {} })),
+      axios.get('http://localhost:8000/api/learning/memories').catch(() => ({ data: [] })),
+    ]).then(([sRes, mRes]) => {
+      setStats(sRes.data || {});
+      setMemories(mRes.data || []);
+    }).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const submitFeedback = async () => {
+    if (!feedback.corrected_output.trim()) return;
+    setSubmitting(true);
+    try {
+      await axios.post('http://localhost:8000/api/learning/feedback', {
+        agent_name: feedback.agent_name,
+        learning_type: feedback.learning_type,
+        context: {},
+        original_output: feedback.original_output,
+        corrected_output: feedback.corrected_output,
+      });
+      setSubmitted(true);
+      setFeedback({ agent_name: 'risk_scorer', learning_type: 'correction', original_output: '', corrected_output: '' });
+      setTimeout(() => { setSubmitted(false); setShowFeedback(false); fetchData(); }, 2000);
+    } catch {
+    } finally { setSubmitting(false); }
+  };
+
+  // Chart data from stats
+  const typeData = stats ? [
+    { name: 'Corrections', value: stats.corrections || 0 },
+    { name: 'Patterns', value: stats.patterns || 0 },
+    { name: 'Optimizations', value: stats.optimizations || 0 },
+    { name: 'Insights', value: stats.insights || 0 },
+  ].filter(d => d.value > 0) : [];
+
+  // Agent breakdown from memories
+  const agentData = {};
+  memories.forEach(m => { agentData[m.agent_name] = (agentData[m.agent_name] || 0) + 1; });
+  const agentChartData = Object.entries(agentData).map(([name, count]) => ({ name, count }));
+
+  if (loading) return <main className="flex-1 bg-[#0b0f19] flex items-center justify-center h-full"><div className="text-indigo-400 text-xl font-bold animate-pulse">Loading Self-Learning Data...</div></main>;
 
   return (
     <main className="flex-1 bg-[#0b0f19] text-white flex flex-col h-full overflow-y-auto p-10 pb-20 custom-scrollbar relative z-10">
-      <header className="mb-8">
-        <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 tracking-tight mb-2">Self-Learning Engine</h1>
-        <p className="text-slate-400 font-medium">Track how D.A.M.I.'s AI agents improve over time — learning from migration decisions, feedback loops, and historical patterns.</p>
+      <header className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 tracking-tight mb-2">Self-Learning Engine</h1>
+          <p className="text-slate-400 font-medium">Track how D.A.M.I.'s AI agents improve over time — learning from human corrections, migration patterns, and feedback loops.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setShowFeedback(!showFeedback)} className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold bg-indigo-600 border border-indigo-500/30 rounded-xl hover:bg-indigo-500 text-white transition-all shadow-lg">
+            <MessageSquare className="w-4 h-4" /> Submit Feedback
+          </button>
+          <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold bg-slate-800 border border-white/10 rounded-xl hover:bg-slate-700 text-slate-300 transition-all">
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+        </div>
       </header>
       <div className="h-px bg-white/10 w-full mb-8" />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-[#131826] rounded-xl p-5 border border-white/[0.05]">
-          <div className="text-sm text-slate-400 mb-1">Current Accuracy</div>
-          <div className="text-4xl font-black text-emerald-400">{currentAccuracy}%</div>
-        </div>
-        <div className="bg-[#131826] rounded-xl p-5 border border-white/[0.05]">
-          <div className="text-sm text-slate-400 mb-1">Total Decisions Made</div>
-          <div className="text-4xl font-bold text-white">{totalDecisions}</div>
-        </div>
-        <div className="bg-[#131826] rounded-xl p-5 border border-white/[0.05]">
-          <div className="text-sm text-slate-400 mb-1">Pattern Improvements</div>
-          <div className="text-4xl font-bold text-indigo-400">{totalImprovements}</div>
-        </div>
-      </div>
-
-      <div className="bg-[#131826] rounded-xl p-6 border border-white/[0.05] shadow-lg mb-8">
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-emerald-400" /> Learning Curve</h3>
-        <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={LEARNING_DATA}>
-              <defs><linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} /><stop offset="95%" stopColor="#6366f1" stopOpacity={0} /></linearGradient></defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="week" stroke="#64748b" tick={{fontSize:11}} />
-              <YAxis domain={[60, 100]} stroke="#64748b" tick={{fontSize:11}} />
-              <Tooltip contentStyle={{backgroundColor:'#0f172a', borderColor:'#1e293b', color:'#fff'}} />
-              <Area type="monotone" dataKey="accuracy" stroke="#6366f1" fill="url(#colorAcc)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="bg-[#131826] rounded-xl p-6 border border-white/[0.05] shadow-lg">
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Lightbulb className="w-5 h-5 text-amber-400" /> Learned Patterns</h3>
-        <div className="space-y-3">
-          {LEARNINGS.map((l, i) => (
-            <div key={i} className="p-4 bg-slate-900/30 rounded-xl border border-white/5 hover:bg-white/[0.02] transition-colors">
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-bold text-white text-sm">{l.title}</div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full">{l.category}</span>
-                  <span className="text-xs font-bold text-emerald-400">{l.confidence}%</span>
+      {/* Feedback Form */}
+      {showFeedback && (
+        <div className="bg-indigo-500/5 rounded-xl p-6 border border-indigo-500/20 mb-8">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-indigo-400" />
+            {submitted ? '✅ Feedback Stored Successfully!' : 'Submit a Correction / Learning'}
+          </h3>
+          {!submitted && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-slate-400 font-bold mb-1 block">Agent</label>
+                  <select value={feedback.agent_name} onChange={e => setFeedback(p => ({...p, agent_name: e.target.value}))} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white">
+                    {AGENT_NAMES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 font-bold mb-1 block">Type</label>
+                  <select value={feedback.learning_type} onChange={e => setFeedback(p => ({...p, learning_type: e.target.value}))} className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="correction">Correction</option><option value="pattern">Pattern</option><option value="optimization">Optimization</option><option value="insight">Insight</option>
+                  </select>
                 </div>
               </div>
-              <p className="text-xs text-slate-400">{l.desc}</p>
-              <div className="text-[10px] text-slate-500 mt-2">{l.date}</div>
+              <div>
+                <label className="text-xs text-slate-400 font-bold mb-1 block">What the agent originally said</label>
+                <textarea value={feedback.original_output} onChange={e => setFeedback(p => ({...p, original_output: e.target.value}))} placeholder="e.g. 'Recommended Rehost for Oracle DB'" rows={2} className="w-full bg-[#0b0f19] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 resize-none" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 font-bold mb-1 block">What it should have said (your correction)</label>
+                <textarea value={feedback.corrected_output} onChange={e => setFeedback(p => ({...p, corrected_output: e.target.value}))} placeholder="e.g. 'Oracle should be Replatform to AlloyDB due to licensing'" rows={2} className="w-full bg-[#0b0f19] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 resize-none" />
+              </div>
+              <button onClick={submitFeedback} disabled={submitting || !feedback.corrected_output.trim()} className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl transition-all">
+                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Storing...</> : <><Send className="w-4 h-4" /> Store Learning</>}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-[#131826] rounded-xl p-5 border border-white/[0.05]">
+          <div className="flex items-center justify-between mb-2"><span className="text-sm text-slate-400">Total Memories</span><BrainCircuit className="w-5 h-5 text-indigo-400" /></div>
+          <div className="text-4xl font-black text-indigo-400">{stats?.total_memories || 0}</div>
+          <div className="text-xs text-slate-500 mt-1">Stored in BigQuery</div>
+        </div>
+        <div className="bg-[#131826] rounded-xl p-5 border border-white/[0.05]">
+          <div className="flex items-center justify-between mb-2"><span className="text-sm text-slate-400">Times Applied</span><Zap className="w-5 h-5 text-emerald-400" /></div>
+          <div className="text-4xl font-bold text-emerald-400">{stats?.total_applications || 0}</div>
+          <div className="text-xs text-slate-500 mt-1">Used in agent prompts</div>
+        </div>
+        <div className="bg-[#131826] rounded-xl p-5 border border-white/[0.05]">
+          <div className="flex items-center justify-between mb-2"><span className="text-sm text-slate-400">Avg Effectiveness</span><TrendingUp className="w-5 h-5 text-amber-400" /></div>
+          <div className="text-4xl font-bold text-amber-400">{((stats?.avg_effectiveness || 0) * 100).toFixed(0)}%</div>
+          <div className="text-xs text-slate-500 mt-1">Based on outcome tracking</div>
+        </div>
+        <div className="bg-[#131826] rounded-xl p-5 border border-white/[0.05]">
+          <div className="flex items-center justify-between mb-2"><span className="text-sm text-slate-400">Agents Learning</span><BookOpen className="w-5 h-5 text-blue-400" /></div>
+          <div className="text-4xl font-bold text-blue-400">{stats?.agents_learning || 0}</div>
+          <div className="text-xs text-slate-500 mt-1">Unique agents with memories</div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="bg-[#131826] rounded-xl p-6 border border-white/[0.05]">
+          <h3 className="text-lg font-bold text-white mb-4">Learning Type Distribution</h3>
+          <div className="h-[250px]">
+            {typeData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart><Pie data={typeData} cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={3} dataKey="value" label={({name, percent}) => `${name} ${(percent*100).toFixed(0)}%`}>
+                  {typeData.map((e, i) => <Cell key={i} fill={Object.values(TYPE_COLORS)[i]} />)}
+                </Pie><Tooltip contentStyle={{backgroundColor:'#0f172a', borderColor:'#1e293b', color:'#fff'}} /></PieChart>
+              </ResponsiveContainer>
+            ) : <div className="flex items-center justify-center h-full text-slate-500">No data yet</div>}
+          </div>
+        </div>
+        <div className="bg-[#131826] rounded-xl p-6 border border-white/[0.05]">
+          <h3 className="text-lg font-bold text-white mb-4">Memories by Agent</h3>
+          <div className="h-[250px]">
+            {agentChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={agentChartData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="name" stroke="#64748b" tick={{fontSize:10}} /><YAxis stroke="#64748b" tick={{fontSize:11}} /><Tooltip contentStyle={{backgroundColor:'#0f172a', borderColor:'#1e293b', color:'#fff'}} /><Bar dataKey="count" fill="#6366f1" radius={[4,4,0,0]} /></BarChart>
+              </ResponsiveContainer>
+            ) : <div className="flex items-center justify-center h-full text-slate-500">No data yet</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* Memory Table */}
+      <div className="bg-[#131826] rounded-xl p-6 border border-white/[0.05] shadow-lg">
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Lightbulb className="w-5 h-5 text-amber-400" /> Stored Memories ({memories.length})</h3>
+        <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+          {memories.map((m, i) => (
+            <div key={i} className="p-4 bg-slate-900/30 rounded-xl border border-white/5 hover:bg-white/[0.02] transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded">{m.agent_name}</span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full`} style={{ background: `${TYPE_COLORS[m.learning_type]}15`, color: TYPE_COLORS[m.learning_type] }}>{m.learning_type}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-slate-500">Applied {m.applied_count}x</span>
+                  <span className="text-xs font-bold text-emerald-400">{((m.effectiveness_score || 0) * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+              {m.corrected_output && <p className="text-xs text-white mb-1"><strong className="text-emerald-400">✅ Correction:</strong> {m.corrected_output}</p>}
+              {m.original_output && <p className="text-[10px] text-slate-500"><strong>Original:</strong> {m.original_output}</p>}
+              {m.tags && m.tags.length > 0 && (
+                <div className="flex gap-1 mt-2">{m.tags.map((t, j) => <span key={j} className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{t}</span>)}</div>
+              )}
             </div>
           ))}
+          {memories.length === 0 && <div className="text-center text-slate-500 p-8">No memories stored yet. Submit feedback above to start learning!</div>}
         </div>
       </div>
     </main>

@@ -530,10 +530,46 @@ export default function ExecutiveDashboard() {
                   rel="noopener noreferrer"
                   className="px-4 py-2 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-500/50 hover:from-emerald-500 hover:to-teal-500 text-white transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20"
                 >
-                  <Rocket className="w-4 h-4" /> Run Live Benchmark
+                  <Rocket className="w-4 h-4" /> Open in New Tab
                 </a>
               </div>
             </div>
+
+            {/* INSTRUCTIONS */}
+            <div className="bg-[#0d1117] px-6 py-4 border-b border-white/5">
+              <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-3">How to Run the Live Benchmark</div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="flex items-start gap-3 bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                  <div className="w-7 h-7 rounded-full bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">1</div>
+                  <div>
+                    <div className="text-white text-xs font-bold mb-0.5">Select GPU Runtime</div>
+                    <div className="text-slate-400 text-[10px] leading-tight">In Colab: Runtime → Change runtime type → <span className="text-emerald-400 font-semibold">T4 GPU</span> → Save</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                  <div className="w-7 h-7 rounded-full bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">2</div>
+                  <div>
+                    <div className="text-white text-xs font-bold mb-0.5">Run All Cells</div>
+                    <div className="text-slate-400 text-[10px] leading-tight">Click <span className="text-emerald-400 font-semibold">Runtime → Run all</span> or press Ctrl+F9. Allow access when prompted.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                  <div className="w-7 h-7 rounded-full bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-xs shrink-0">3</div>
+                  <div>
+                    <div className="text-white text-xs font-bold mb-0.5">Watch the Results</div>
+                    <div className="text-slate-400 text-[10px] leading-tight">CPU runs first (slow), then GPU (fast). <span className="text-emerald-400 font-semibold">Charts auto-generate</span> with speedup comparison.</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                  <div className="w-7 h-7 rounded-full bg-emerald-600/30 border border-emerald-500/40 flex items-center justify-center text-emerald-300 font-bold text-xs shrink-0">4</div>
+                  <div>
+                    <div className="text-white text-xs font-bold mb-0.5">See Live Results Here</div>
+                    <div className="text-slate-400 text-[10px] leading-tight">Results auto-write to BigQuery. Click <span className="text-emerald-400 font-semibold">↻ Refresh Results</span> above to update the dashboard.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="w-full h-[600px] bg-black">
               <iframe
                 src="https://colab.research.google.com/github/dheerajyadav1714/dami-migration/blob/refinement-v3/notebooks/rapids_live_benchmark.ipynb"

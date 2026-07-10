@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents.discovery import DiscoveryAgent
 from agents.risk_scorer import RiskScorerAgent
 from agents.wave_planner import WavePlannerAgent
-import chat_service
+from api import chat_service
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 

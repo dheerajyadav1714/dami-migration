@@ -74,7 +74,7 @@ export default function ExecutiveDashboard() {
           api.get('/api/project/stats').catch(() => ({data: {}})),
           api.get('/api/project/readiness').catch(() => ({data: {overall_score: 0, dimension_scores: {}}})),
           api.get('/api/project/benchmarks').catch(() => ({data: {has_real_benchmarks: false, real_benchmarks: [], simulated_benchmarks: []}})),
-          api.get('/api/charts/migration-velocity').catch(() => ({data: []})),
+          api.get(`/api/charts/migration-velocity?time_range=${timeRange}`).catch(() => ({data: []})),
           api.get('/api/project/activity').catch(() => ({data: []}))
         ]);
         
@@ -92,6 +92,13 @@ export default function ExecutiveDashboard() {
     
     fetchData();
   }, []);
+
+  // Re-fetch velocity when time range changes
+  useEffect(() => {
+    api.get(`/api/charts/migration-velocity?time_range=${timeRange}`)
+      .then(res => { if (res.data.length > 0) setVelocity(res.data); })
+      .catch(() => {});
+  }, [timeRange]);
 
   const handleOrchestratorRun = async (e) => {
     e.preventDefault();

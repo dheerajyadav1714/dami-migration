@@ -38,7 +38,7 @@ class AgentRunRequest(BaseModel):
 class OrchestratorRunRequest(BaseModel):
     prompt: str
 
-@app.get("/")
+@app.get("/api/info")
 def read_root():
     return {
         "status": "online",

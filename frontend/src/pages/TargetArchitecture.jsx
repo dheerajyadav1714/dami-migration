@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import api from '../lib/api';
-import { Network, ArrowRight, Cloud, Server, Database, Cpu, Bot, Loader2, Copy, Check, ChevronDown, ChevronRight, DollarSign, Shield, Layers, Zap } from 'lucide-react';
+import { Network, ArrowRight, Cloud, Server, Database, Cpu, Bot, Loader2, Copy, Check, ChevronDown, ChevronRight, DollarSign, Shield, Layers, Zap, MapPin } from 'lucide-react';
 
 const CLOUD_PROVIDERS = [
   { value: 'Google Cloud Platform', label: 'Google Cloud', icon: '☁️', color: 'from-blue-500 to-emerald-500' },
@@ -10,19 +10,34 @@ const CLOUD_PROVIDERS = [
 
 const SERVICE_ICONS = {
   'Compute Engine': { icon: '🖥️', color: 'bg-blue-500/10 border-blue-500/20 text-blue-400' },
+  'Amazon EC2': { icon: '🖥️', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400' },
+  'Azure Virtual Machines': { icon: '🖥️', color: 'bg-sky-500/10 border-sky-500/20 text-sky-400' },
   'GKE Autopilot': { icon: '☸️', color: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' },
+  'Amazon EKS': { icon: '☸️', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400' },
+  'Azure Kubernetes': { icon: '☸️', color: 'bg-sky-500/10 border-sky-500/20 text-sky-400' },
   'Cloud SQL': { icon: '🗄️', color: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' },
+  'Amazon RDS': { icon: '🗄️', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400' },
+  'Azure Database': { icon: '🗄️', color: 'bg-sky-500/10 border-sky-500/20 text-sky-400' },
   'Cloud Load Balancing': { icon: '⚖️', color: 'bg-purple-500/10 border-purple-500/20 text-purple-400' },
+  'Elastic Load': { icon: '⚖️', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400' },
+  'Azure Load': { icon: '⚖️', color: 'bg-sky-500/10 border-sky-500/20 text-sky-400' },
   'Memorystore': { icon: '⚡', color: 'bg-amber-500/10 border-amber-500/20 text-amber-400' },
+  'ElastiCache': { icon: '⚡', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400' },
+  'Azure Cache': { icon: '⚡', color: 'bg-sky-500/10 border-sky-500/20 text-sky-400' },
   'Pub/Sub': { icon: '📨', color: 'bg-pink-500/10 border-pink-500/20 text-pink-400' },
+  'Amazon SNS': { icon: '📨', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400' },
+  'Azure Service Bus': { icon: '📨', color: 'bg-sky-500/10 border-sky-500/20 text-sky-400' },
   'Bare Metal': { icon: '🏗️', color: 'bg-red-500/10 border-red-500/20 text-red-400' },
   'Managed Service': { icon: '🔑', color: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' },
+  'AWS Directory': { icon: '🔑', color: 'bg-orange-500/10 border-orange-500/20 text-orange-400' },
+  'Azure Active Directory': { icon: '🔑', color: 'bg-sky-500/10 border-sky-500/20 text-sky-400' },
   'Retire': { icon: '🗑️', color: 'bg-slate-500/10 border-slate-500/20 text-slate-400' },
 };
 
 const getServiceStyle = (name) => {
+  if (!name) return { icon: '☁️', color: 'bg-slate-500/10 border-slate-500/20 text-slate-400' };
   for (const [key, val] of Object.entries(SERVICE_ICONS)) {
-    if (name?.includes(key)) return val;
+    if (name.includes(key)) return val;
   }
   return { icon: '☁️', color: 'bg-slate-500/10 border-slate-500/20 text-slate-400' };
 };
@@ -33,6 +48,7 @@ const STRATEGY_COLORS = {
   'refactor': 'bg-purple-500/15 text-purple-400 border-purple-500/30',
   'retire': 'bg-red-500/15 text-red-400 border-red-500/30',
   'relocate': 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  'repurchase': 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
 };
 
 export default function TargetArchitecture() {
@@ -46,12 +62,20 @@ export default function TargetArchitecture() {
   const [expandedRows, setExpandedRows] = useState({});
   const [filterService, setFilterService] = useState('All');
 
+  // Fetch architecture data — re-fetches when cloud provider changes
   useEffect(() => {
-    api.get('/api/target-architecture')
+    setLoading(true);
+    api.get(`/api/target-architecture?cloud_provider=${encodeURIComponent(selectedProvider)}`)
       .then(res => setArchData(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedProvider]);
+
+  // Reset AI output and filter when provider changes
+  useEffect(() => {
+    setAiArch(null);
+    setFilterService('All');
+  }, [selectedProvider]);
 
   const generateAiArch = async () => {
     setAiLoading(true);
@@ -79,7 +103,7 @@ export default function TargetArchitecture() {
   const filteredMappings = useMemo(() => {
     if (!archData?.mappings) return [];
     if (filterService === 'All') return archData.mappings;
-    return archData.mappings.filter(m => m.target_gcp_service === filterService);
+    return archData.mappings.filter(m => m.target_service === filterService);
   }, [archData, filterService]);
 
   const currentProvider = CLOUD_PROVIDERS.find(p => p.value === selectedProvider) || CLOUD_PROVIDERS[0];
@@ -87,9 +111,9 @@ export default function TargetArchitecture() {
   if (loading) return <main className="flex-1 bg-[#0b0f19] flex items-center justify-center h-full"><div className="text-indigo-400 text-xl font-bold animate-pulse">Loading Architecture...</div></main>;
 
   const tabs = [
-    { id: 'topology', label: '🗺️ Visual Topology', icon: Network },
-    { id: 'ai', label: '🤖 AI Architecture', icon: Bot },
-    { id: 'mapping', label: '🔍 Component Mapping', icon: Layers },
+    { id: 'topology', label: '🗺️ Visual Topology' },
+    { id: 'ai', label: '🤖 AI Architecture' },
+    { id: 'mapping', label: '🔍 Component Mapping' },
   ];
 
   return (
@@ -138,22 +162,22 @@ export default function TargetArchitecture() {
         </div>
         <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-xl p-5 border border-cyan-500/20">
           <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4 text-cyan-400" />
+            <MapPin className="w-4 h-4 text-cyan-400" />
             <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Target Region</span>
           </div>
-          <div className="text-xl font-black text-white mt-1">us-central1</div>
+          <div className="text-xl font-black text-white mt-1">{archData?.target_region || 'us-central1'}</div>
         </div>
       </div>
 
       {/* Service Distribution */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
         {archData?.service_summary?.map((svc, i) => {
-          const style = getServiceStyle(svc.target_gcp_service);
+          const style = getServiceStyle(svc.target_service);
           return (
             <div key={i} className={`${style.color} rounded-xl p-4 border cursor-pointer hover:scale-[1.02] transition-transform`}
-              onClick={() => { setFilterService(svc.target_gcp_service); setActiveTab('mapping'); }}>
+              onClick={() => { setFilterService(svc.target_service); setActiveTab('mapping'); }}>
               <div className="text-lg mb-1">{style.icon}</div>
-              <div className="text-xs font-semibold text-slate-300 mb-1">{svc.target_gcp_service}</div>
+              <div className="text-xs font-semibold text-slate-300 mb-1 truncate" title={svc.target_service}>{svc.target_service}</div>
               <div className="text-xl font-black text-white">{svc.server_count}</div>
               <div className="text-[10px] text-slate-400 mt-1">${svc.total_monthly_cost?.toLocaleString()}/mo</div>
             </div>
@@ -182,14 +206,14 @@ export default function TargetArchitecture() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h3 className="text-xl font-bold text-white">Architecture Topology ({currentProvider.label})</h3>
-              <p className="text-sm text-slate-400 mt-1">Data-driven diagram from {archData?.total_mapped || 0} mapped workloads in BigQuery</p>
+              <p className="text-sm text-slate-400 mt-1">Data-driven from {archData?.total_mapped || 0} mapped workloads in BigQuery</p>
             </div>
             <button onClick={copyMermaid} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg text-xs font-bold text-slate-300 transition-colors border border-white/10">
-              {copiedMermaid ? <><Check className="w-4 h-4 text-emerald-400" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy Mermaid Code</>}
+              {copiedMermaid ? <><Check className="w-4 h-4 text-emerald-400" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy Mermaid</>}
             </button>
           </div>
           
-          {/* Professional Topology Visualization */}
+          {/* Professional Topology */}
           <div className="relative bg-gradient-to-br from-slate-900/80 to-slate-900/40 rounded-2xl border border-white/5 p-10 overflow-x-auto">
             <div className="flex items-stretch justify-between gap-6 min-w-[900px]">
               
@@ -209,18 +233,21 @@ export default function TargetArchitecture() {
                       if (!groups[wt]) groups[wt] = 0;
                       groups[wt]++;
                     });
-                    return Object.entries(groups).sort((a, b) => b[1] - a[1]).map(([wt, count], i) => (
-                      <div key={i} className="bg-red-500/5 border border-red-500/15 rounded-xl px-4 py-3 flex items-center justify-between group hover:border-red-500/30 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <Server className="w-4 h-4 text-red-400" />
-                          <div>
-                            <div className="text-xs font-bold text-slate-300">{wt}</div>
-                            <div className="text-[10px] text-slate-500">VMware VMs</div>
+                    return Object.entries(groups).sort((a, b) => b[1] - a[1]).map(([wt, count], i) => {
+                      const wtIcons = { APP: '📱', WEB: '🖥️', DB: '🗄️', CACHE: '⚡', LB: '⚖️', QUEUE: '📨', INFRA: '🔑', LEGACY: '🗑️' };
+                      return (
+                        <div key={i} className="bg-red-500/5 border border-red-500/15 rounded-xl px-4 py-3 flex items-center justify-between group hover:border-red-500/30 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm">{wtIcons[wt] || '📦'}</span>
+                            <div>
+                              <div className="text-xs font-bold text-slate-300">{wt}</div>
+                              <div className="text-[10px] text-slate-500">VMware VMs</div>
+                            </div>
                           </div>
+                          <div className="bg-red-500/20 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-red-400">{count}</div>
                         </div>
-                        <div className="bg-red-500/20 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-red-400">{count}</div>
-                      </div>
-                    ));
+                      );
+                    });
                   })()}
                 </div>
               </div>
@@ -261,13 +288,13 @@ export default function TargetArchitecture() {
                 </div>
                 <div className="space-y-2">
                   {archData?.service_summary?.map((svc, i) => {
-                    const style = getServiceStyle(svc.target_gcp_service);
+                    const style = getServiceStyle(svc.target_service);
                     return (
                       <div key={i} className={`${style.color} rounded-xl px-4 py-3 border flex items-center justify-between group hover:scale-[1.01] transition-transform`}>
                         <div className="flex items-center gap-3">
                           <span className="text-lg">{style.icon}</span>
                           <div>
-                            <div className="text-xs font-bold text-slate-300">{svc.target_gcp_service}</div>
+                            <div className="text-xs font-bold text-slate-300 max-w-[180px] truncate" title={svc.target_service}>{svc.target_service}</div>
                             <div className="text-[10px] text-slate-500">${svc.avg_monthly_cost}/mo avg</div>
                           </div>
                         </div>
@@ -286,11 +313,11 @@ export default function TargetArchitecture() {
         <div className="bg-[#131826] rounded-2xl p-8 border border-white/[0.05] shadow-xl">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-xl font-bold text-white flex items-center gap-2"><Bot className="w-5 h-5 text-indigo-400" /> AI-Generated Architecture ({currentProvider.label})</h3>
-              <p className="text-sm text-slate-400 mt-1">Gemini analyzes your full server inventory, risk scores, and workload patterns to generate a comprehensive architecture.</p>
+              <h3 className="text-xl font-bold text-white flex items-center gap-2"><Bot className="w-5 h-5 text-indigo-400" /> AI Architecture ({currentProvider.label})</h3>
+              <p className="text-sm text-slate-400 mt-1">Gemini analyzes 10,000 servers and generates a {currentProvider.label}-specific architecture document.</p>
             </div>
             <button onClick={generateAiArch} disabled={aiLoading} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/20">
-              {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating with Gemini...</> : <><Zap className="w-4 h-4" /> Generate Architecture</>}
+              {aiLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Zap className="w-4 h-4" /> Generate for {currentProvider.label}</>}
             </button>
           </div>
           
@@ -298,7 +325,7 @@ export default function TargetArchitecture() {
             <div className="bg-slate-900/50 rounded-xl p-12 text-center border border-white/5">
               <Loader2 className="w-12 h-12 text-indigo-400 mx-auto mb-4 animate-spin" />
               <div className="text-lg font-bold text-white mb-2">Gemini is analyzing your infrastructure...</div>
-              <div className="text-sm text-slate-400">Querying 10,000 servers, risk scores, and workload patterns from BigQuery</div>
+              <div className="text-sm text-slate-400">Querying 10,000 servers, risk scores, and workload patterns from BigQuery for {currentProvider.label}</div>
             </div>
           )}
 
@@ -307,7 +334,7 @@ export default function TargetArchitecture() {
               <div className="flex items-center justify-between px-5 py-3 bg-slate-800/50 border-b border-white/5">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Generated by Gemini 2.5 Flash</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Generated by Gemini · {currentProvider.label}</span>
                 </div>
                 <button onClick={() => {navigator.clipboard.writeText(aiArch);}} className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
                   <Copy className="w-3 h-3" /> Copy
@@ -322,9 +349,9 @@ export default function TargetArchitecture() {
           {!aiArch && !aiLoading && (
             <div className="bg-gradient-to-br from-slate-900/50 to-indigo-900/10 rounded-xl p-12 text-center border border-indigo-500/10">
               <Bot className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-              <div className="text-lg font-bold text-slate-400 mb-2">Generate Architecture Recommendation</div>
+              <div className="text-lg font-bold text-slate-400 mb-2">Generate {currentProvider.label} Architecture</div>
               <div className="text-sm text-slate-500 max-w-md mx-auto">
-                Click "Generate Architecture" to have Gemini analyze your full server inventory ({archData?.total_mapped || 0} mapped workloads), risk scores, and workload patterns to create a comprehensive {currentProvider.label} architecture document.
+                Click the button above to generate a comprehensive {currentProvider.label} architecture using real server data from BigQuery.
               </div>
             </div>
           )}
@@ -337,17 +364,20 @@ export default function TargetArchitecture() {
             <div>
               <h3 className="text-xl font-bold text-white">Component Mapping Table</h3>
               <p className="text-sm text-slate-400 mt-1">
-                {filterService !== 'All' ? `Showing ${filteredMappings.length} workloads → ${filterService}` : `All ${archData?.mappings?.length || 0} AI-mapped workloads`}
+                {filterService !== 'All' ? `Showing ${filteredMappings.length} workloads → ${filterService}` : `All ${archData?.mappings?.length || 0} AI-mapped workloads → ${currentProvider.label}`}
               </p>
             </div>
             <div className="flex gap-2 items-center">
               <select value={filterService} onChange={e => setFilterService(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-lg px-4 py-2 text-xs text-white">
-                <option value="All">All Services</option>
+                <option value="All">All Services ({archData?.mappings?.length || 0})</option>
                 {archData?.service_summary?.map((s, i) => (
-                  <option key={i} value={s.target_gcp_service}>{s.target_gcp_service} ({s.server_count})</option>
+                  <option key={i} value={s.target_service}>{s.target_service} ({s.server_count})</option>
                 ))}
               </select>
+              {filterService !== 'All' && (
+                <button onClick={() => setFilterService('All')} className="text-xs text-indigo-400 hover:text-indigo-300">Clear</button>
+              )}
             </div>
           </div>
           <div className="overflow-x-auto max-h-[600px] custom-scrollbar rounded-xl border border-white/5">
@@ -357,7 +387,7 @@ export default function TargetArchitecture() {
                   <th className="p-3 w-8"></th>
                   <th className="p-3">Source VM</th>
                   <th className="p-3">Workload</th>
-                  <th className="p-3">OS / Source Tech</th>
+                  <th className="p-3">Source Technology</th>
                   <th className="p-3">Strategy</th>
                   <th className="p-3 text-center">→</th>
                   <th className="p-3">{currentProvider.label} Target</th>
@@ -366,8 +396,11 @@ export default function TargetArchitecture() {
                 </tr>
               </thead>
               <tbody className="text-slate-300 divide-y divide-white/5 bg-[#0f141f]">
+                {filteredMappings.length === 0 && (
+                  <tr><td colSpan={9} className="p-8 text-center text-slate-500">No mappings found.</td></tr>
+                )}
                 {filteredMappings.map((m, i) => {
-                  const style = getServiceStyle(m.target_gcp_service);
+                  const style = getServiceStyle(m.target_service);
                   const strategy = (m.recommended_strategy || '').toLowerCase();
                   const strategyColor = STRATEGY_COLORS[strategy] || 'bg-slate-500/15 text-slate-400 border-slate-500/30';
                   return (
@@ -379,21 +412,21 @@ export default function TargetArchitecture() {
                         <td className="p-3 font-medium text-indigo-300">
                           <div className="flex items-center gap-2">
                             <Server className="w-3 h-3 text-slate-500 flex-shrink-0" />
-                            <span className="truncate max-w-[150px]">{m.source_name}</span>
+                            <span className="truncate max-w-[150px]" title={m.source_name}>{m.source_name}</span>
                           </div>
                         </td>
                         <td className="p-3"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded-full text-[10px] font-bold">{m.workload_type || '—'}</span></td>
-                        <td className="p-3 text-xs text-slate-400 max-w-[180px] truncate">{m.os || m.source_tech}</td>
+                        <td className="p-3 text-xs text-slate-400 max-w-[200px] truncate" title={m.source_tech}>{m.source_tech || '—'}</td>
                         <td className="p-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${strategyColor}`}>{m.recommended_strategy || '—'}</span></td>
                         <td className="p-3 text-center"><ArrowRight className="w-4 h-4 text-indigo-400 mx-auto" /></td>
                         <td className="p-3 font-medium text-emerald-300">
                           <div className="flex items-center gap-2">
                             <span>{style.icon}</span>
-                            <span className="truncate max-w-[160px]">{m.target_gcp_service}</span>
+                            <span className="truncate max-w-[180px]" title={m.target_service}>{m.target_service}</span>
                           </div>
                         </td>
                         <td className="p-3 text-xs text-slate-400">{m.target_machine_type || '—'}</td>
-                        <td className="p-3 text-right font-bold text-emerald-400">${m.cost_estimate_monthly?.toLocaleString() || '—'}</td>
+                        <td className="p-3 text-right font-bold text-emerald-400">${m.cost_estimate_monthly?.toLocaleString() || '0'}</td>
                       </tr>
                       {expandedRows[i] && (
                         <tr>
@@ -408,10 +441,9 @@ export default function TargetArchitecture() {
                                 </div>
                               )}
                               <div className="flex gap-4 mt-3 pt-3 border-t border-white/5 text-[10px] text-slate-500">
-                                <span>vCPU: <strong className="text-slate-300">{m.vcpu || '—'}</strong></span>
-                                <span>RAM: <strong className="text-slate-300">{m.ram_gb ? `${m.ram_gb}GB` : '—'}</strong></span>
-                                <span>Env: <strong className="text-slate-300">{m.environment || '—'}</strong></span>
+                                <span>Server ID: <strong className="text-slate-300">{m.server_id || '—'}</strong></span>
                                 <span>Region: <strong className="text-slate-300">{m.target_region || '—'}</strong></span>
+                                <span>Cost: <strong className="text-emerald-400">${m.cost_estimate_monthly?.toLocaleString()}/mo</strong></span>
                               </div>
                             </div>
                           </td>

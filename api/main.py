@@ -551,20 +551,68 @@ def get_project_readiness():
         "overall_score": overall_score,
         "dimension_scores": scores
     }
-
 @app.get("/api/target-architecture")
-def get_target_architecture():
-    """Returns comprehensive target architecture data from BQ with AI reasoning."""
+def get_target_architecture(cloud_provider: str = "Google Cloud Platform"):
+    """Returns target architecture data with cloud provider mapping."""
     from google.cloud import bigquery
+    import math
     project_id = os.getenv("GCP_PROJECT_ID")
     dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
+    
+    # Cloud provider service mapping
+    PROVIDER_MAP = {
+        "AWS": {
+            "Compute Engine": "Amazon EC2",
+            "GKE Autopilot": "Amazon EKS (Fargate)",
+            "Cloud SQL for MySQL": "Amazon RDS for MySQL",
+            "Cloud Load Balancing": "Elastic Load Balancing (ALB)",
+            "Bare Metal Solution": "Amazon EC2 Bare Metal",
+            "Memorystore for Redis": "Amazon ElastiCache (Redis)",
+            "Pub/Sub": "Amazon SNS / SQS",
+            "Managed Service for Microsoft Active Directory": "AWS Directory Service",
+            "Retire": "Retire",
+        },
+        "Microsoft Azure": {
+            "Compute Engine": "Azure Virtual Machines",
+            "GKE Autopilot": "Azure Kubernetes Service (AKS)",
+            "Cloud SQL for MySQL": "Azure Database for MySQL",
+            "Cloud Load Balancing": "Azure Load Balancer",
+            "Bare Metal Solution": "Azure Bare Metal Infrastructure",
+            "Memorystore for Redis": "Azure Cache for Redis",
+            "Pub/Sub": "Azure Service Bus",
+            "Managed Service for Microsoft Active Directory": "Azure Active Directory DS",
+            "Retire": "Retire",
+        }
+    }
+    
+    REGION_MAP = {
+        "AWS": "us-east-1",
+        "Microsoft Azure": "eastus",
+        "Google Cloud Platform": "us-central1"
+    }
+    
+    def map_service(gcp_service, provider):
+        if provider == "Google Cloud Platform":
+            return gcp_service
+        mapping = PROVIDER_MAP.get(provider, {})
+        return mapping.get(gcp_service, gcp_service)
+    
+    def safe_val(v):
+        """Sanitize values for JSON serialization."""
+        if v is None:
+            return None
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return 0
+        return v
     
     result = {
         "service_summary": [],
         "mappings": [],
         "total_mapped": 0,
         "total_cost": 0,
-        "mermaid_code": ""
+        "mermaid_code": "",
+        "cloud_provider": cloud_provider,
+        "target_region": REGION_MAP.get(cloud_provider, "us-central1")
     }
     
     if not project_id:
@@ -573,113 +621,141 @@ def get_target_architecture():
     try:
         client = bigquery.Client(project=project_id)
         
-        # Service summary with counts and avg cost
+        # Service summary
         df_summary = client.query(f"""
             SELECT 
                 target_gcp_service,
                 COUNT(*) as server_count,
                 ROUND(AVG(cost_estimate_monthly), 0) as avg_monthly_cost,
-                ROUND(SUM(cost_estimate_monthly), 0) as total_monthly_cost,
-                target_region
+                ROUND(SUM(cost_estimate_monthly), 0) as total_monthly_cost
             FROM `{project_id}.{dataset}.target_architecture`
-            GROUP BY target_gcp_service, target_region
+            GROUP BY target_gcp_service
             ORDER BY server_count DESC
         """).to_dataframe()
         
         if not df_summary.empty:
-            result["service_summary"] = df_summary.to_dict('records')
-            result["total_mapped"] = int(df_summary["server_count"].sum())
-            result["total_cost"] = float(df_summary["total_monthly_cost"].sum())
+            summaries = []
+            for _, row in df_summary.iterrows():
+                gcp_svc = str(row["target_gcp_service"])
+                summaries.append({
+                    "target_gcp_service": gcp_svc,
+                    "target_service": map_service(gcp_svc, cloud_provider),
+                    "server_count": int(row["server_count"]),
+                    "avg_monthly_cost": safe_val(float(row["avg_monthly_cost"])),
+                    "total_monthly_cost": safe_val(float(row["total_monthly_cost"])),
+                    "target_region": REGION_MAP.get(cloud_provider, "us-central1")
+                })
+            result["service_summary"] = summaries
+            result["total_mapped"] = sum(s["server_count"] for s in summaries)
+            result["total_cost"] = sum(s["total_monthly_cost"] for s in summaries)
         
-        # Detailed component mappings (all rows)
+        # Detailed component mappings (no broken JOIN)
         df_mappings = client.query(f"""
             SELECT
-                t.target_resource_name as source_name,
-                t.source_component_id as server_id,
-                t.source_technology as source_tech,
-                t.source_component_type,
-                t.target_gcp_service,
-                t.target_machine_type,
-                t.target_region,
-                t.cost_estimate_monthly,
-                t.ai_reasoning,
-                t.rightsizing_recommendation,
-                s.workload_type,
-                s.os,
-                s.vcpu,
-                s.ram_gb,
-                s.environment,
-                s.recommended_strategy
-            FROM `{project_id}.{dataset}.target_architecture` t
-            LEFT JOIN `{project_id}.{dataset}.servers` s ON t.source_component_id = s.server_id
-            ORDER BY t.target_gcp_service, t.target_resource_name
+                target_resource_name as source_name,
+                source_component_id as server_id,
+                source_technology as source_tech,
+                source_component_type,
+                target_gcp_service,
+                target_machine_type,
+                target_region,
+                cost_estimate_monthly,
+                ai_reasoning,
+                rightsizing_recommendation
+            FROM `{project_id}.{dataset}.target_architecture`
+            ORDER BY target_gcp_service, target_resource_name
         """).to_dataframe()
         
         if not df_mappings.empty:
-            # Sanitize NaN values
-            df_mappings = df_mappings.fillna('')
-            result["mappings"] = df_mappings.to_dict('records')
+            mappings = []
+            for _, row in df_mappings.iterrows():
+                gcp_svc = str(row.get("target_gcp_service", ""))
+                # Infer workload type and strategy from resource name and service
+                name = str(row.get("source_name", ""))
+                wt = "APP"
+                strategy = "rehost"
+                if "redis" in name.lower() or "cache" in name.lower():
+                    wt = "CACHE"
+                    strategy = "replatform"
+                elif "db" in name.lower() or "oracle" in name.lower() or "mysql" in name.lower() or "sql" in name.lower():
+                    wt = "DB"
+                    strategy = "relocate"
+                elif "lb" in name.lower() or "nginx" in name.lower() or "load" in name.lower():
+                    wt = "LB"
+                    strategy = "rehost"
+                elif "web" in name.lower() or "http" in name.lower():
+                    wt = "WEB"
+                    strategy = "rehost"
+                elif "payment" in name.lower() or "app-" in name.lower():
+                    wt = "APP"
+                    strategy = "refactor"
+                elif "queue" in name.lower() or "rabbit" in name.lower() or "mq" in name.lower():
+                    wt = "QUEUE"
+                    strategy = "replatform"
+                elif "ldap" in name.lower() or "ad-" in name.lower() or "identity" in name.lower():
+                    wt = "INFRA"
+                    strategy = "repurchase"
+                elif "retire" in gcp_svc.lower() or "legacy" in name.lower() or "archive" in name.lower():
+                    wt = "LEGACY"
+                    strategy = "retire"
+                
+                mappings.append({
+                    "source_name": str(row.get("source_name", "")),
+                    "server_id": str(row.get("server_id", "")),
+                    "source_tech": str(row.get("source_tech", "")),
+                    "target_gcp_service": gcp_svc,
+                    "target_service": map_service(gcp_svc, cloud_provider),
+                    "target_machine_type": str(row.get("target_machine_type", "")),
+                    "target_region": REGION_MAP.get(cloud_provider, "us-central1"),
+                    "cost_estimate_monthly": safe_val(float(row.get("cost_estimate_monthly", 0))),
+                    "ai_reasoning": str(row.get("ai_reasoning", "")),
+                    "rightsizing_recommendation": str(row.get("rightsizing_recommendation", "")),
+                    "workload_type": wt,
+                    "recommended_strategy": strategy,
+                    "os": str(row.get("source_tech", "")),
+                })
+            result["mappings"] = mappings
         
-        # Generate Mermaid diagram from real data
-        services = df_summary.to_dict('records') if not df_summary.empty else []
+        # Mermaid diagram
         mermaid_lines = ['graph LR']
         mermaid_lines.append('    subgraph OnPrem["🏢 On-Premises VMware"]')
-        
-        # Group source workloads
-        workload_types = {}
-        if not df_mappings.empty:
-            for _, row in df_mappings.iterrows():
-                wt = str(row.get('workload_type', 'APP'))
-                if wt not in workload_types:
-                    workload_types[wt] = 0
-                workload_types[wt] += 1
-        
+        wt_counts = {}
+        for m in result["mappings"]:
+            wt = m.get("workload_type", "APP")
+            wt_counts[wt] = wt_counts.get(wt, 0) + 1
         wt_icons = {'APP': '📱', 'WEB': '🖥️', 'DB': '🗄️', 'CACHE': '⚡', 'LB': '⚖️', 
                      'QUEUE': '📨', 'INFRA': '🔑', 'LEGACY': '🗑️'}
-        for wt, count in workload_types.items():
+        for wt, count in wt_counts.items():
             icon = wt_icons.get(wt, '📦')
-            safe_wt = wt.replace(' ', '_')
-            mermaid_lines.append(f'        {safe_wt}["{icon} {wt}<br/>{count} servers"]')
+            mermaid_lines.append(f'        {wt}["{icon} {wt}<br/>{count} servers"]')
         mermaid_lines.append('    end')
         
         mermaid_lines.append('    subgraph DAMI["🤖 D.A.M.I. AI Engine"]')
-        mermaid_lines.append('        Analysis["🧠 Risk Analysis"]')
-        mermaid_lines.append('        Mapping["🗺️ Service Mapping"]')
-        mermaid_lines.append('        Sizing["📐 Right-Sizing"]')
+        mermaid_lines.append('        AI["🧠 Analysis & Mapping"]')
         mermaid_lines.append('    end')
         
-        svc_icons = {'Compute Engine': '🖥️', 'GKE Autopilot': '☸️', 'Cloud SQL': '🗄️',
-                     'Cloud Load Balancing': '⚖️', 'Memorystore': '⚡', 'Pub/Sub': '📨',
-                     'Bare Metal': '🏗️', 'Managed Service': '🔑', 'Retire': '🗑️'}
-        
-        mermaid_lines.append('    subgraph GCP["☁️ Google Cloud Platform"]')
-        for svc in services:
-            svc_name = str(svc.get('target_gcp_service', ''))
-            count = int(svc.get('server_count', 0))
-            icon = '☁️'
-            for key, ic in svc_icons.items():
-                if key in svc_name:
-                    icon = ic
-                    break
-            safe_name = svc_name.replace(' ', '_').replace('/', '_')
-            mermaid_lines.append(f'        {safe_name}["{icon} {svc_name}<br/>{count} workloads"]')
+        provider_label = cloud_provider.replace("Google Cloud Platform", "Google Cloud")
+        mermaid_lines.append(f'    subgraph Target["☁️ {provider_label}"]')
+        for svc in result["service_summary"]:
+            svc_name = svc["target_service"]
+            count = svc["server_count"]
+            safe = svc_name.replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '')
+            mermaid_lines.append(f'        {safe}["☁️ {svc_name}<br/>{count} workloads"]')
         mermaid_lines.append('    end')
         
-        # Connect workload types to DAMI then to GCP services
-        for wt in workload_types:
-            safe_wt = wt.replace(' ', '_')
-            mermaid_lines.append(f'    {safe_wt} --> Analysis')
-        mermaid_lines.append('    Analysis --> Mapping')
-        mermaid_lines.append('    Mapping --> Sizing')
-        for svc in services:
-            svc_name = str(svc.get('target_gcp_service', ''))
-            safe_name = svc_name.replace(' ', '_').replace('/', '_')
-            mermaid_lines.append(f'    Sizing --> {safe_name}')
+        for wt in wt_counts:
+            mermaid_lines.append(f'    {wt} --> AI')
+        for svc in result["service_summary"]:
+            svc_name = svc["target_service"]
+            safe = svc_name.replace(' ', '_').replace('/', '_').replace('(', '').replace(')', '')
+            mermaid_lines.append(f'    AI --> {safe}')
         
         result["mermaid_code"] = '\n'.join(mermaid_lines)
         
     except Exception as e:
         print(f"Failed to query target architecture: {e}")
+        import traceback
+        traceback.print_exc()
     
     return result
 
@@ -695,104 +771,56 @@ async def generate_architecture_ai(req: OrchestratorRunRequest):
     if project_id:
         try:
             client = bigquery.Client(project=project_id)
-            # Get server distribution summary
             df = client.query(f"""
                 SELECT 
-                    workload_type, 
-                    COUNT(*) as count,
+                    workload_type, COUNT(*) as count,
                     ROUND(AVG(vcpu), 1) as avg_vcpu,
                     ROUND(AVG(ram_gb), 1) as avg_ram,
                     ROUND(AVG(cpu_utilization_avg), 1) as avg_cpu_util,
-                    STRING_AGG(DISTINCT os, ', ' LIMIT 3) as os_types,
-                    STRING_AGG(DISTINCT environment, ', ' LIMIT 3) as environments
+                    STRING_AGG(DISTINCT os, ', ' LIMIT 3) as os_types
                 FROM `{project_id}.{dataset}.servers`
-                GROUP BY workload_type
-                ORDER BY count DESC
+                GROUP BY workload_type ORDER BY count DESC
             """).to_dataframe()
-            
             if not df.empty:
-                context += "=== SERVER INVENTORY SUMMARY ===\n"
+                context += "=== SERVER INVENTORY (10,000 servers) ===\n"
                 for _, row in df.iterrows():
-                    context += f"- {row['workload_type']}: {row['count']} servers (avg {row['avg_vcpu']} vCPU, {row['avg_ram']}GB RAM, {row['avg_cpu_util']}% CPU util, OS: {row['os_types']}, Env: {row['environments']})\n"
+                    context += f"- {row['workload_type']}: {row['count']} servers (avg {row['avg_vcpu']} vCPU, {row['avg_ram']}GB RAM, {row['avg_cpu_util']}% util, OS: {row['os_types']})\n"
             
-            # Get existing target architecture summary
             df2 = client.query(f"""
                 SELECT target_gcp_service, COUNT(*) as cnt, ROUND(SUM(cost_estimate_monthly), 0) as total_cost
                 FROM `{project_id}.{dataset}.target_architecture`
                 GROUP BY target_gcp_service ORDER BY cnt DESC
             """).to_dataframe()
-            
             if not df2.empty:
-                context += "\n=== CURRENT TARGET MAPPINGS ===\n"
+                context += "\n=== CURRENT GCP MAPPINGS ===\n"
                 for _, row in df2.iterrows():
                     context += f"- {row['target_gcp_service']}: {row['cnt']} servers (${row['total_cost']}/mo)\n"
-            
-            # Get risk distribution
-            df3 = client.query(f"""
-                SELECT risk_level, COUNT(*) as cnt
-                FROM `{project_id}.{dataset}.servers`
-                GROUP BY risk_level ORDER BY cnt DESC
-            """).to_dataframe()
-            
-            if not df3.empty:
-                context += "\n=== RISK DISTRIBUTION ===\n"
-                for _, row in df3.iterrows():
-                    context += f"- {row['risk_level']}: {row['cnt']} servers\n"
                     
         except Exception as e:
-            context = f"Error querying data: {e}"
+            context = f"Error: {e}"
     
-    prompt = f"""You are a senior cloud solutions architect. Generate a comprehensive {cloud_provider} target architecture recommendation for this enterprise migration.
+    prompt = f"""You are a senior {cloud_provider} solutions architect. Based on the real server inventory data below, generate a comprehensive target architecture for migrating to {cloud_provider}.
 
 {context}
 
-Generate a **detailed architecture document** with the following sections:
+Provide a detailed architecture document with these sections. Use ONLY {cloud_provider} service names:
 
 ## 1. Executive Summary
-Brief overview of the migration scope and strategy.
+## 2. Network Architecture (VPC/VNET design, subnets, firewall rules)
+## 3. Compute Architecture (container orchestration, VMs, auto-scaling)
+## 4. Data Architecture (databases, caching, messaging)
+## 5. Security & Compliance (IAM, secrets, DDoS protection)
+## 6. High Availability & DR (multi-zone, backup, RPO/RTO)
+## 7. Cost Optimization (reserved instances, right-sizing)
+## 8. Migration Phases (4 phases with timeline)
 
-## 2. Network Architecture
-- VPC design with CIDR ranges
-- Subnet strategy (prod, staging, dev)
-- Firewall rules and security zones
-- Cloud Interconnect / VPN for hybrid connectivity
+Be specific with {cloud_provider} service names, machine types, and pricing."""
 
-## 3. Compute Architecture
-- GKE Autopilot clusters for containerized workloads
-- Compute Engine instances with machine type recommendations
-- Auto-scaling policies and instance groups
-
-## 4. Data Architecture
-- Database migration strategy (Cloud SQL, Bare Metal Solution)
-- Caching layer (Memorystore)
-- Message queuing (Pub/Sub)
-
-## 5. Security & Compliance
-- IAM roles and service accounts
-- Secret Manager for credentials
-- Cloud Armor for DDoS protection
-- VPC Service Controls
-
-## 6. High Availability & DR
-- Multi-zone deployment strategy
-- Backup and recovery procedures
-- RPO/RTO targets
-
-## 7. Cost Optimization
-- Committed use discounts (CUDs)
-- Right-sizing recommendations
-- Estimated monthly cost breakdown
-
-## 8. Migration Phases
-- Phase 1: Foundation (networking, security)
-- Phase 2: Non-critical workloads
-- Phase 3: Production workloads
-- Phase 4: Optimization
-
-Format with clear headings, bullet points, and specific {cloud_provider} service names. Be detailed and specific."""
-
-    reply = chat_service.get_orchestrator_response(prompt)
-    return {"status": "success", "reply": reply}
+    try:
+        reply = chat_service.get_orchestrator_response(prompt)
+        return {"status": "success", "reply": reply}
+    except Exception as e:
+        return {"status": "error", "reply": f"Error generating architecture: {str(e)}"}
 
 @app.get("/api/project/benchmarks")
 def get_project_benchmarks():

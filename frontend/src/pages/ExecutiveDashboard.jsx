@@ -521,10 +521,10 @@ export default function ExecutiveDashboard() {
                         <tbody className="text-slate-300 divide-y divide-white/5">
                             {(benchmarks.has_real_benchmarks ? benchmarks.real_benchmarks : benchmarks.simulated_benchmarks).map((row, i) => (
                                 <tr key={i}>
-                                    <td className="py-2">{row.rows_processed}</td>
-                                    <td className="py-2 text-right">{row.pandas_cpu_ms || row.processing_seconds}ms</td>
-                                    <td className="py-2 text-right text-emerald-400">{row.cudf_gpu_ms ? `${row.cudf_gpu_ms}ms` : <span className="text-slate-500 italic">Pending</span>}</td>
-                                    <td className="py-2 text-right font-bold text-indigo-400">{row.speedup ? `${row.speedup}x` : (row.speedup_factor ? `${row.speedup_factor}x` : <span className="text-slate-500 italic">—</span>)}</td>
+                                    <td className="py-2">{(row.rows_processed || 0).toLocaleString()}</td>
+                                    <td className="py-2 text-right">{row.pandas_cpu_ms}ms</td>
+                                    <td className="py-2 text-right text-emerald-400">{row.cudf_gpu_ms}ms</td>
+                                    <td className="py-2 text-right font-bold text-indigo-400">{row.speedup}x</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -539,8 +539,8 @@ export default function ExecutiveDashboard() {
                             <YAxis stroke="#64748b" tick={{fontSize: 10}} axisLine={false} tickLine={false} />
                             <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff'}} itemStyle={{fontSize: 12}} />
                             <Legend wrapperStyle={{fontSize: 10, paddingTop: '10px'}} />
-                            <Bar dataKey={benchmarks.has_real_benchmarks ? "processing_seconds" : "pandas_cpu_ms"} name="Pandas (CPU)" fill="#334155" barSize={12} radius={[2,2,0,0]} />
-                            <Bar dataKey={benchmarks.has_real_benchmarks ? "cudf_gpu_ms" : "cudf_gpu_ms"} name="cuDF (GPU)" fill="#10b981" barSize={12} radius={[2,2,0,0]} />
+                            <Bar dataKey="pandas_cpu_ms" name="Pandas (CPU)" fill="#334155" barSize={12} radius={[2,2,0,0]} />
+                            <Bar dataKey="cudf_gpu_ms" name="cuDF (GPU)" fill="#10b981" barSize={12} radius={[2,2,0,0]} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>

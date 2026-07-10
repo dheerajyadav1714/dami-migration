@@ -461,7 +461,7 @@ def get_project_readiness():
 def get_project_benchmarks():
     from google.cloud import bigquery
     project_id = os.getenv("GCP_PROJECT_ID")
-    dataset_v3 = os.getenv("BIGQUERY_DATASET_V3", "dami_data_v3")
+    dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
     has_real_benchmarks = False
     benchmarks = []
@@ -480,15 +480,25 @@ def get_project_benchmarks():
         try:
             client = bigquery.Client(project=project_id)
             df = client.query(f"""
-                SELECT benchmark_id, method, rows_processed, processing_seconds,
-                       speedup_factor, gpu_device, platform
-                FROM `{project_id}.{dataset_v3}.gpu_benchmarks`
-                ORDER BY created_at DESC
+                SELECT rows, pandas_ms, cudf_ms, speedup, gpu_device, benchmark_id, timestamp
+                FROM `{project_id}.{dataset}.rapids_benchmarks`
+                ORDER BY timestamp DESC
                 LIMIT 20
             """).to_dataframe()
             if not df.empty:
                 has_real_benchmarks = True
-                benchmarks = df.to_dict('records')
+                # Normalize column names to match frontend expectations
+                records = []
+                for _, row in df.iterrows():
+                    records.append({
+                        "rows_processed": int(row.get("rows", 0)),
+                        "pandas_cpu_ms": round(float(row.get("pandas_ms", 0)), 1),
+                        "cudf_gpu_ms": round(float(row.get("cudf_ms", 0)), 1),
+                        "speedup": f"{float(row.get('speedup', 0)):.1f}",
+                        "gpu_device": row.get("gpu_device", ""),
+                        "benchmark_id": row.get("benchmark_id", "")
+                    })
+                benchmarks = records
         except Exception as e:
             print(f"Failed to query real benchmarks: {e}")
             

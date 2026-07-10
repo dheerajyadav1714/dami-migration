@@ -110,10 +110,11 @@ export default function ExecutiveDashboard() {
 
   const runAgent = async (phase) => {
     try {
-      await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase });
-      alert(`Triggered ${phase} agent successfully!`);
+      const res = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase });
+      alert(res.data?.message || `Triggered ${phase} agent successfully!`);
     } catch(e) {
-      alert(`Failed to trigger ${phase} agent.`);
+      const msg = e.response?.data?.detail || e.message || 'Unknown error';
+      alert(`${phase} agent: ${msg}`);
     }
   };
 
@@ -144,11 +145,9 @@ export default function ExecutiveDashboard() {
                     try {
                       const res = await api.post('/api/chat', { prompt: `Generate a comprehensive executive migration report for project "${stats.name}" for client "${stats.client_name}". Include: ${stats.total_servers} servers discovered, ${stats.total_waves} migration waves planned, estimated annual savings of $${stats.savings_val}, current phase: ${stats.phase}. Format as a professional executive summary with sections for Overview, Key Metrics, Risk Assessment, Wave Plan Summary, Cost Analysis, and Next Steps.` });
                       const report = res.data?.reply || 'Report generation failed.';
-                      const blob = new Blob([report], {type: 'text/markdown'});
-                      const a = document.createElement('a');
-                      a.href = URL.createObjectURL(blob);
-                      a.download = `DAMI_Executive_Report_${new Date().toISOString().slice(0,10)}.md`;
-                      a.click();
+                      // Open in a new modal-style window
+                      const w = window.open('', '_blank', 'width=800,height=600');
+                      w.document.write(`<html><head><title>D.A.M.I. Report</title><style>body{font-family:system-ui;max-width:800px;margin:40px auto;padding:0 20px;color:#1e1e50;line-height:1.6}h1,h2,h3{color:#1e1e50}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#4f46e5;color:#fff}pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}</style></head><body>${report.replace(/\n/g,'<br>')}<br><br><button onclick="window.print()" style="background:#4f46e5;color:#fff;padding:10px 24px;border:none;border-radius:6px;cursor:pointer;font-size:14px">Print / Save as PDF</button></body></html>`);
                     } catch {
                       alert('Failed to generate report. Ensure backend is running.');
                     }
@@ -158,13 +157,17 @@ export default function ExecutiveDashboard() {
                 </button>
                 <button 
                   className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg font-semibold transition-all shadow-[0_0_15px_rgba(79,70,229,0.4)] flex items-center gap-2 text-sm"
-                  onClick={() => {
-                    const report = `# D.A.M.I. Executive Migration Report\n## Project: ${stats.name}\n## Client: ${stats.client_name}\n## Generated: ${new Date().toLocaleString()}\n\n---\n\n### Key Metrics\n| Metric | Value |\n|--------|-------|\n| Total Servers Discovered | ${stats.total_servers} VMs |\n| Migration Waves Planned | ${stats.total_waves} |\n| Estimated Annual Savings | $${(stats.savings_val / 1000).toFixed(0)}K (${stats.savings_pct}%) |\n| Current Phase | ${stats.phase} |\n| Migration Readiness | ${readiness.overall_score}% |\n\n### Readiness Dimensions\n${Object.entries(readiness.dimension_scores).map(([k, v]) => `- **${k}**: ${v}%`).join('\n')}\n\n### NVIDIA RAPIDS Acceleration\n${(benchmarks.has_real_benchmarks ? benchmarks.real_benchmarks : benchmarks.simulated_benchmarks).map(b => `- ${b.rows_processed} rows: CPU ${b.pandas_cpu_ms || b.processing_seconds}ms → GPU ${b.cudf_gpu_ms || '-'}ms (${b.speedup || b.speedup_factor + 'x'})`).join('\n')}\n`;
-                    const blob = new Blob([report], {type: 'text/markdown'});
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `DAMI_Executive_Report_${new Date().toISOString().slice(0,10)}.md`;
-                    a.click();
+                  onClick={async () => {
+                    try {
+                      const res = await api.get('/api/report/pdf', { responseType: 'blob' });
+                      const blob = new Blob([res.data], { type: 'application/pdf' });
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `DAMI_Executive_Report_${new Date().toISOString().slice(0,10)}.pdf`;
+                      a.click();
+                    } catch {
+                      alert('Failed to export PDF report.');
+                    }
                   }}
                 >
                     <Download className="w-4 h-4" /> Export Report
@@ -490,8 +493,8 @@ export default function ExecutiveDashboard() {
                                 <tr key={i}>
                                     <td className="py-2">{row.rows_processed}</td>
                                     <td className="py-2 text-right">{row.pandas_cpu_ms || row.processing_seconds}ms</td>
-                                    <td className="py-2 text-right text-emerald-400">{row.cudf_gpu_ms || '-'}ms</td>
-                                    <td className="py-2 text-right font-bold text-indigo-400">{row.speedup || row.speedup_factor + 'x'}</td>
+                                    <td className="py-2 text-right text-emerald-400">{row.cudf_gpu_ms ? `${row.cudf_gpu_ms}ms` : <span className="text-slate-500 italic">Pending</span>}</td>
+                                    <td className="py-2 text-right font-bold text-indigo-400">{row.speedup ? `${row.speedup}x` : (row.speedup_factor ? `${row.speedup_factor}x` : <span className="text-slate-500 italic">—</span>)}</td>
                                 </tr>
                             ))}
                         </tbody>

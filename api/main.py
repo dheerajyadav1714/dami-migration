@@ -817,10 +817,33 @@ Provide a detailed architecture document with these sections. Use ONLY {cloud_pr
 Be specific with {cloud_provider} service names, machine types, and pricing."""
 
     try:
-        reply = chat_service.get_orchestrator_response(prompt)
-        return {"status": "success", "reply": reply}
+        from google.genai import Client
+        from google.genai import types
+        
+        vertex_project = os.getenv("VERTEX_PROJECT_ID", os.getenv("GCP_PROJECT_ID", "cohort-2-497207"))
+        location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
+        
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            gemini_client = Client(api_key=api_key)
+            model_name = "gemini-2.5-flash"
+        else:
+            gemini_client = Client(vertexai=True, project=vertex_project, location=location)
+            model_name = "gemini-2.5-flash"
+        
+        response = gemini_client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.4,
+            )
+        )
+        return {"status": "success", "reply": response.text}
     except Exception as e:
-        return {"status": "error", "reply": f"Error generating architecture: {str(e)}"}
+        print(f"Architecture generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "reply": f"Generation failed: {str(e)[:200]}"}
 
 @app.get("/api/project/benchmarks")
 def get_project_benchmarks():

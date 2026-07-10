@@ -759,6 +759,8 @@ def get_target_architecture(cloud_provider: str = "Google Cloud Platform"):
     
     return result
 
+import asyncio
+
 @app.post("/api/target-architecture/generate")
 async def generate_architecture_ai(req: OrchestratorRunRequest):
     """Generates AI architecture recommendation using Gemini with real BQ data."""
@@ -831,13 +833,16 @@ Be specific with {cloud_provider} service names, machine types, and pricing."""
             gemini_client = Client(vertexai=True, project=vertex_project, location=location)
             model_name = "gemini-2.5-flash"
         
-        response = gemini_client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.4,
+        def call_gemini():
+            return gemini_client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.4,
+                )
             )
-        )
+            
+        response = await asyncio.to_thread(call_gemini)
         return {"status": "success", "reply": response.text}
     except Exception as e:
         print(f"Architecture generation failed: {e}")

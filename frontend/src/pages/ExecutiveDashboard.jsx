@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../lib/api';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 import { 
   Download, 
   Server, 
@@ -143,13 +144,20 @@ export default function ExecutiveDashboard() {
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg font-semibold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-2 text-sm"
                   onClick={async () => {
                     try {
+                      const btn = document.getElementById('gen-report-btn');
+                      if (btn) { btn.textContent = '⏳ Generating...'; btn.disabled = true; }
                       const res = await api.post('/api/chat', { prompt: `Generate a comprehensive executive migration report for project "${stats.name}" for client "${stats.client_name}". Include: ${stats.total_servers} servers discovered, ${stats.total_waves} migration waves planned, estimated annual savings of $${stats.savings_val}, current phase: ${stats.phase}. Format as a professional executive summary with sections for Overview, Key Metrics, Risk Assessment, Wave Plan Summary, Cost Analysis, and Next Steps.` });
                       const report = res.data?.reply || 'Report generation failed.';
-                      // Open in a new modal-style window
-                      const w = window.open('', '_blank', 'width=800,height=600');
-                      w.document.write(`<html><head><title>D.A.M.I. Report</title><style>body{font-family:system-ui;max-width:800px;margin:40px auto;padding:0 20px;color:#1e1e50;line-height:1.6}h1,h2,h3{color:#1e1e50}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#4f46e5;color:#fff}pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}</style></head><body>${report.replace(/\n/g,'<br>')}<br><br><button onclick="window.print()" style="background:#4f46e5;color:#fff;padding:10px 24px;border:none;border-radius:6px;cursor:pointer;font-size:14px">Print / Save as PDF</button></body></html>`);
+                      const blob = new Blob([report], {type: 'text/markdown;charset=utf-8'});
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `DAMI_AI_Report_${new Date().toISOString().slice(0,10)}.md`;
+                      a.click();
+                      if (btn) { btn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg> Generate Report'; btn.disabled = false; }
                     } catch {
                       alert('Failed to generate report. Ensure backend is running.');
+                      const btn = document.getElementById('gen-report-btn');
+                      if (btn) { btn.innerHTML = '🚀 Generate Report'; btn.disabled = false; }
                     }
                   }}
                 >
@@ -428,8 +436,30 @@ export default function ExecutiveDashboard() {
                         </button>
                     </form>
                     {orchestratorResponse && (
-                      <div className={`mt-3 p-3 rounded-lg text-xs ${orchestratorResponse.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                        {orchestratorResponse.text}
+                      <div className={`mt-3 rounded-xl border overflow-hidden ${orchestratorResponse.success ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
+                        <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border-b ${orchestratorResponse.success ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                          {orchestratorResponse.success ? '✅ D.A.M.I. Response' : '❌ Error'}
+                        </div>
+                        <div className="p-4 max-h-[300px] overflow-y-auto custom-scrollbar text-xs leading-relaxed text-slate-300 prose prose-invert prose-xs max-w-none
+                          [&_h1]:text-base [&_h1]:font-bold [&_h1]:text-white [&_h1]:mt-3 [&_h1]:mb-2
+                          [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-white [&_h2]:mt-3 [&_h2]:mb-2
+                          [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-indigo-300 [&_h3]:mt-2 [&_h3]:mb-1
+                          [&_p]:mb-2 [&_p]:text-slate-300
+                          [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-2 [&_ul]:text-slate-300
+                          [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-2
+                          [&_li]:mb-0.5
+                          [&_strong]:text-white [&_strong]:font-semibold
+                          [&_em]:text-slate-400 [&_em]:italic
+                          [&_code]:bg-slate-800 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-emerald-400 [&_code]:text-[11px]
+                          [&_pre]:bg-slate-900 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:mb-3
+                          [&_blockquote]:border-l-2 [&_blockquote]:border-indigo-500 [&_blockquote]:pl-3 [&_blockquote]:text-slate-400 [&_blockquote]:italic [&_blockquote]:my-2
+                          [&_table]:w-full [&_table]:text-xs [&_table]:border-collapse
+                          [&_th]:bg-slate-800 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:text-slate-300 [&_th]:font-semibold [&_th]:border [&_th]:border-slate-700
+                          [&_td]:px-2 [&_td]:py-1 [&_td]:border [&_td]:border-slate-700/50
+                          [&_hr]:border-slate-700 [&_hr]:my-3
+                          [&_a]:text-indigo-400 [&_a]:underline">
+                          <ReactMarkdown>{orchestratorResponse.text}</ReactMarkdown>
+                        </div>
                       </div>
                     )}
                 </div>

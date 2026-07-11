@@ -1,3 +1,17 @@
+# ============================================================
+# D.A.M.I. v3 — Multi-stage Dockerfile
+# Serves: React frontend (static) + FastAPI backend + Streamlit
+# ============================================================
+
+# Stage 1: Build React frontend
+FROM node:20-slim AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci --production=false
+COPY frontend/ .
+RUN npm run build
+
+# Stage 2: Production image
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -6,7 +20,7 @@ ENV PYTHONPATH=/app
 
 WORKDIR /app
 
-# Install system dependencies (graphviz for dependency graphs, curl for healthcheck)
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     graphviz curl \
     && rm -rf /var/lib/apt/lists/*
@@ -14,6 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies
 COPY requirements-cloud.txt .
 RUN pip install --no-cache-dir -r requirements-cloud.txt
+
+# Copy built React frontend
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Copy application code
 COPY .streamlit/ .streamlit/
@@ -25,7 +42,6 @@ COPY schemas/ schemas/
 COPY scripts/ scripts/
 COPY ui/ ui/
 COPY .env.example .env.example
-COPY README.md README.md
 
 # Create runtime directories
 RUN mkdir -p generated_assets/reports generated_assets/wave_0 \
@@ -36,12 +52,9 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:8080/_stcore/health || exit 1
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
-# Run Streamlit on Cloud Run port
-ENTRYPOINT ["streamlit", "run", "ui/app.py", \
-    "--server.port=8080", \
-    "--server.address=0.0.0.0", \
-    "--server.headless=true", \
-    "--browser.gatherUsageStats=false", \
-    "--server.fileWatcherType=none"]
+# Start script: FastAPI serves both API and static React files
+COPY deploy/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+CMD ["/app/start.sh"]

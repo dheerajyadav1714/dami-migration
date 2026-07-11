@@ -19,7 +19,7 @@ class ArchitectureDesignerAgent:
         if api_key:
             self.client = Client(api_key=api_key)
         else:
-            self.client = Client(enterprise=True)
+            self.client = Client(vertexai=True, project=self.project_id, location=self.location)
 
     def _ask_gemini(self, prompt: str, json_mode: bool = False) -> str:
         """Call Gemini model and return text response."""
@@ -70,24 +70,21 @@ class ArchitectureDesignerAgent:
         # Include enrichment context if available
         enrichment = getattr(self, '_enrichment_context', '')
 
-        prompt = f"""You are a Senior Google Cloud Architect. Analyze each server and recommend the BEST GCP target service.
+        prompt = f"""You are a Senior Cloud Architect. Analyze each server and recommend the BEST target service for GCP, AWS, and Azure.
 
 RULES:
-- Choose from ALL GCP services: Compute Engine, GKE Autopilot, Cloud Run, Cloud SQL (MySQL/Postgres/SQLServer), AlloyDB, Cloud Spanner, Memorystore, Bare Metal Solution, GCVE, Cloud Functions, Dataflow, BigQuery, Pub/Sub, Filestore, Cloud Load Balancing, Cloud DNS, Cloud CDN, Apigee, etc.
-- For "relocate": GCVE only for VMware workloads needing VMware compatibility. Otherwise use Compute Engine.
-- For "replatform" DB: Choose best managed DB based on engine and size (AlloyDB for large Postgres, Cloud Spanner for global scale, Cloud SQL for standard).
-- For "refactor": Cloud Run for stateless/low-traffic, GKE for microservices, Cloud Functions for event-driven.
-- For "rehost": Compute Engine with proper family (e2=dev/test, n2=general prod, c3=compute-intensive, n2-highmem=memory-intensive).
-- Rightsize if CPU util < 15% and RAM < 30%.
-- Consider compliance score: high compliance (>7) needs private networking, encryption, audit logging.
-- Consider environment: PROD needs HA & multi-zone, DEV/TEST can be single-zone and preemptible.
-- Estimate realistic monthly cost in USD.
+- Choose from ALL native services for each cloud (e.g. GCP: Compute Engine, GKE; AWS: EC2, EKS; Azure: VMs, AKS).
+- For "relocate": Use VMware Engine / VMware Cloud equivalents for workloads needing VMware compatibility.
+- For "replatform" DB: Choose best managed DB based on engine and size for each cloud.
+- For "refactor": Use Serverless/Containers as appropriate (e.g., Cloud Run / Fargate / Azure Container Apps).
+- For "rehost": Use VMs with proper instance families for each cloud.
+- Estimate realistic monthly cost in USD for each cloud based on the required machine type/SKU.
 {enrichment}
 SERVERS:
 {chr(10).join(server_summaries)}
 
-Respond with ONLY a JSON array. Each element:
-{{"server_id":"...","target_service":"...","target_resource_name":"...","target_machine_type":"...","rightsizing_recommendation":"...","ai_reasoning":"...","cost_estimate_monthly":0.0,"target_config":{{"vpc_network":"dami-prod-vpc","subnet":"subnet-...","subnet_cidr":"10.1.x.x/24","disk_type":"pd-ssd","high_availability":true,"backup_enabled":false}}}}
+Respond with ONLY a JSON array. Each element must strictly match this format:
+{{"server_id":"...","target_gcp_service":"...","target_gcp_machine":"...","target_gcp_cost":0.0,"target_aws_service":"...","target_aws_machine":"...","target_aws_cost":0.0,"target_azure_service":"...","target_azure_machine":"...","target_azure_cost":0.0,"ai_reasoning":"...","rightsizing_recommendation":"..."}}
 
 No markdown fences. No explanation. ONLY valid JSON array."""
 
@@ -199,14 +196,18 @@ No markdown fences. No explanation. ONLY valid JSON array."""
                         "source_component_id": rec.get("server_id", "unknown"),
                         "source_component_type": "server",
                         "source_technology": f"VMware VM ({os_name})",
-                        "target_gcp_service": rec.get("target_service", "compute-engine"),
-                        "target_resource_name": rec.get("target_resource_name", "gce-unknown"),
-                        "target_machine_type": rec.get("target_machine_type", "n2-standard-2"),
+                        "target_gcp_service": rec.get("target_gcp_service", "compute-engine"),
+                        "target_gcp_machine": rec.get("target_gcp_machine", "n2-standard-2"),
+                        "target_gcp_cost": float(rec.get("target_gcp_cost", 48.50)),
+                        "target_aws_service": rec.get("target_aws_service", "Amazon EC2"),
+                        "target_aws_machine": rec.get("target_aws_machine", "t3.large"),
+                        "target_aws_cost": float(rec.get("target_aws_cost", 48.50)),
+                        "target_azure_service": rec.get("target_azure_service", "Azure Virtual Machines"),
+                        "target_azure_machine": rec.get("target_azure_machine", "Standard_D2s_v3"),
+                        "target_azure_cost": float(rec.get("target_azure_cost", 48.50)),
                         "target_region": "us-central1",
-                        "target_configuration": target_config if isinstance(target_config, str) else json.dumps(target_config),
                         "rightsizing_recommendation": rec.get("rightsizing_recommendation", "Retained original specs."),
                         "ai_reasoning": rec.get("ai_reasoning", "AI-recommended mapping."),
-                        "cost_estimate_monthly": float(rec.get("cost_estimate_monthly", 48.50)),
                         "project_id": self.project_id
                     })
             else:
@@ -220,7 +221,8 @@ No markdown fences. No explanation. ONLY valid JSON array."""
         # Write to BigQuery - target_architecture (full details for UI)
         table_ref = client.dataset(self.dataset).table("target_architecture")
         job_config = bigquery.LoadJobConfig(
-            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+            autodetect=True
         )
         try:
             job = client.load_table_from_json(all_mappings, table_ref, job_config=job_config)
@@ -321,13 +323,17 @@ No markdown fences. No explanation. ONLY valid JSON array."""
             "source_component_type": "server",
             "source_technology": f"VMware VM ({srv['os']})",
             "target_gcp_service": target_service,
-            "target_resource_name": target_resource_name,
-            "target_machine_type": target_machine_type,
+            "target_gcp_machine": target_machine_type,
+            "target_gcp_cost": cost_map.get(target_service, 48.50),
+            "target_aws_service": target_service,
+            "target_aws_machine": target_machine_type,
+            "target_aws_cost": cost_map.get(target_service, 48.50),
+            "target_azure_service": target_service,
+            "target_azure_machine": target_machine_type,
+            "target_azure_cost": cost_map.get(target_service, 48.50),
             "target_region": "us-central1",
-            "target_configuration": json.dumps({"vpc_network": "dami-vpc", "subnet": f"subnet-{target_service}"}),
             "rightsizing_recommendation": rightsizing_rec,
             "ai_reasoning": f"Fallback: {strategy} -> {target_service}.",
-            "cost_estimate_monthly": cost_map.get(target_service, 48.50),
             "project_id": self.project_id
         }
 

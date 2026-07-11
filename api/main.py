@@ -559,44 +559,25 @@ def get_target_architecture(cloud_provider: str = "Google Cloud Platform"):
     project_id = os.getenv("GCP_PROJECT_ID")
     dataset = os.getenv("BIGQUERY_DATASET", "dami_v3")
     
-    # Cloud provider service mapping
-    PROVIDER_MAP = {
-        "AWS": {
-            "Compute Engine": "Amazon EC2",
-            "GKE Autopilot": "Amazon EKS (Fargate)",
-            "Cloud SQL for MySQL": "Amazon RDS for MySQL",
-            "Cloud Load Balancing": "Elastic Load Balancing (ALB)",
-            "Bare Metal Solution": "Amazon EC2 Bare Metal",
-            "Memorystore for Redis": "Amazon ElastiCache (Redis)",
-            "Pub/Sub": "Amazon SNS / SQS",
-            "Managed Service for Microsoft Active Directory": "AWS Directory Service",
-            "Retire": "Retire",
-        },
-        "Microsoft Azure": {
-            "Compute Engine": "Azure Virtual Machines",
-            "GKE Autopilot": "Azure Kubernetes Service (AKS)",
-            "Cloud SQL for MySQL": "Azure Database for MySQL",
-            "Cloud Load Balancing": "Azure Load Balancer",
-            "Bare Metal Solution": "Azure Bare Metal Infrastructure",
-            "Memorystore for Redis": "Azure Cache for Redis",
-            "Pub/Sub": "Azure Service Bus",
-            "Managed Service for Microsoft Active Directory": "Azure Active Directory DS",
-            "Retire": "Retire",
-        }
-    }
-    
+    if cloud_provider == "AWS":
+        service_col = "target_aws_service"
+        machine_col = "target_aws_machine"
+        cost_col = "target_aws_cost"
+    elif cloud_provider == "Microsoft Azure":
+        service_col = "target_azure_service"
+        machine_col = "target_azure_machine"
+        cost_col = "target_azure_cost"
+    else:
+        service_col = "target_gcp_service"
+        machine_col = "target_gcp_machine"
+        cost_col = "target_gcp_cost"
+
     REGION_MAP = {
         "AWS": "us-east-1",
         "Microsoft Azure": "eastus",
         "Google Cloud Platform": "us-central1"
     }
-    
-    def map_service(gcp_service, provider):
-        if provider == "Google Cloud Platform":
-            return gcp_service
-        mapping = PROVIDER_MAP.get(provider, {})
-        return mapping.get(gcp_service, gcp_service)
-    
+
     def safe_val(v):
         """Sanitize values for JSON serialization."""
         if v is None:
@@ -624,78 +605,77 @@ def get_target_architecture(cloud_provider: str = "Google Cloud Platform"):
         # Service summary
         df_summary = client.query(f"""
             SELECT 
-                target_gcp_service,
+                {service_col} as target_service,
                 COUNT(*) as server_count,
-                ROUND(AVG(cost_estimate_monthly), 0) as avg_monthly_cost,
-                ROUND(SUM(cost_estimate_monthly), 0) as total_monthly_cost
+                ROUND(AVG({cost_col}), 0) as avg_monthly_cost,
+                ROUND(SUM({cost_col}), 0) as total_monthly_cost
             FROM `{project_id}.{dataset}.target_architecture`
-            GROUP BY target_gcp_service
+            GROUP BY {service_col}
             ORDER BY server_count DESC
         """).to_dataframe()
         
         if not df_summary.empty:
             summaries = []
             for _, row in df_summary.iterrows():
-                gcp_svc = str(row["target_gcp_service"])
                 summaries.append({
-                    "target_gcp_service": gcp_svc,
-                    "target_service": map_service(gcp_svc, cloud_provider),
+                    "target_gcp_service": str(row["target_service"]), # maintained for UI compatibility
+                    "target_service": str(row["target_service"]),
                     "server_count": int(row["server_count"]),
                     "avg_monthly_cost": safe_val(float(row["avg_monthly_cost"])),
                     "total_monthly_cost": safe_val(float(row["total_monthly_cost"])),
-                    "target_region": REGION_MAP.get(cloud_provider, "us-central1")
+                    "target_region": "us-east-1" if cloud_provider == "AWS" else "eastus" if cloud_provider == "Microsoft Azure" else "us-central1"
                 })
             result["service_summary"] = summaries
             result["total_mapped"] = sum(s["server_count"] for s in summaries)
             result["total_cost"] = sum(s["total_monthly_cost"] for s in summaries)
         
-        # Detailed component mappings (no broken JOIN)
+        # Detailed component mappings
         df_mappings = client.query(f"""
             SELECT
                 target_resource_name as source_name,
                 source_component_id as server_id,
                 source_technology as source_tech,
                 source_component_type,
-                target_gcp_service,
-                target_machine_type,
+                {service_col} as target_service,
+                {machine_col} as target_machine_type,
                 target_region,
-                cost_estimate_monthly,
+                {cost_col} as cost_estimate_monthly,
                 ai_reasoning,
                 rightsizing_recommendation
             FROM `{project_id}.{dataset}.target_architecture`
-            ORDER BY target_gcp_service, target_resource_name
+            ORDER BY {service_col}, target_resource_name
         """).to_dataframe()
         
         if not df_mappings.empty:
             mappings = []
             for _, row in df_mappings.iterrows():
-                gcp_svc = str(row.get("target_gcp_service", ""))
+                svc = str(row.get("target_service", ""))
                 # Infer workload type and strategy from resource name and service
                 name = str(row.get("source_name", ""))
                 wt = "APP"
                 strategy = "rehost"
-                if "redis" in name.lower() or "cache" in name.lower():
+                if "redis" in name.lower() or "cache" in name.lower() or "elasticache" in svc.lower():
                     wt = "CACHE"
                     strategy = "replatform"
-                elif "db" in name.lower() or "oracle" in name.lower() or "mysql" in name.lower() or "sql" in name.lower():
+                elif "db" in name.lower() or "oracle" in name.lower() or "mysql" in name.lower() or "sql" in name.lower() or "rds" in svc.lower():
                     wt = "DB"
                     strategy = "relocate"
-                elif "lb" in name.lower() or "nginx" in name.lower() or "load" in name.lower():
+                elif "lb" in name.lower() or "nginx" in name.lower() or "load" in name.lower() or "alb" in svc.lower():
                     wt = "LB"
                     strategy = "rehost"
                 elif "web" in name.lower() or "http" in name.lower():
                     wt = "WEB"
                     strategy = "rehost"
-                elif "payment" in name.lower() or "app-" in name.lower():
+                elif "payment" in name.lower() or "app-" in name.lower() or "eks" in svc.lower() or "aks" in svc.lower():
                     wt = "APP"
                     strategy = "refactor"
-                elif "queue" in name.lower() or "rabbit" in name.lower() or "mq" in name.lower():
+                elif "queue" in name.lower() or "rabbit" in name.lower() or "mq" in name.lower() or "sns" in svc.lower() or "bus" in svc.lower():
                     wt = "QUEUE"
                     strategy = "replatform"
-                elif "ldap" in name.lower() or "ad-" in name.lower() or "identity" in name.lower():
+                elif "ldap" in name.lower() or "ad-" in name.lower() or "identity" in name.lower() or "directory" in svc.lower():
                     wt = "INFRA"
                     strategy = "repurchase"
-                elif "retire" in gcp_svc.lower() or "legacy" in name.lower() or "archive" in name.lower():
+                elif "retire" in svc.lower() or "legacy" in name.lower() or "archive" in name.lower():
                     wt = "LEGACY"
                     strategy = "retire"
                 
@@ -703,10 +683,10 @@ def get_target_architecture(cloud_provider: str = "Google Cloud Platform"):
                     "source_name": str(row.get("source_name", "")),
                     "server_id": str(row.get("server_id", "")),
                     "source_tech": str(row.get("source_tech", "")),
-                    "target_gcp_service": gcp_svc,
-                    "target_service": map_service(gcp_svc, cloud_provider),
+                    "target_gcp_service": svc,
+                    "target_service": svc,
                     "target_machine_type": str(row.get("target_machine_type", "")),
-                    "target_region": REGION_MAP.get(cloud_provider, "us-central1"),
+                    "target_region": "us-east-1" if cloud_provider == "AWS" else "eastus" if cloud_provider == "Microsoft Azure" else "us-central1",
                     "cost_estimate_monthly": safe_val(float(row.get("cost_estimate_monthly", 0))),
                     "ai_reasoning": str(row.get("ai_reasoning", "")),
                     "rightsizing_recommendation": str(row.get("rightsizing_recommendation", "")),
@@ -801,11 +781,27 @@ async def generate_architecture_ai(req: OrchestratorRunRequest):
         except Exception as e:
             context = f"Error: {e}"
     
-    prompt = f"""You are a senior {cloud_provider} solutions architect. Based on the real server inventory data below, generate a comprehensive target architecture for migrating to {cloud_provider}.
+    prompt = f"""You are a senior {cloud_provider} solutions architect. Based on the real server inventory data below, generate a comprehensive target architecture for migrating 10,000 servers from an On-Premises VMware environment to {cloud_provider}.
+Note: The context below includes an existing mapping to GCP services. Use this strictly as a behind-the-scenes reference for workload intent (e.g., containerization vs VMs vs managed DBs), but you MUST design the final architecture using ONLY native {cloud_provider} services.
+CRITICAL: Do NOT mention "Google Cloud Platform" or "GCP" anywhere in your generated text. You are migrating from "On-Premises VMware" to "{cloud_provider}".
 
 {context}
 
-Provide a detailed architecture document with these sections. Use ONLY {cloud_provider} service names:
+CRITICAL REQUIREMENT: At the very beginning of your response, you MUST generate a highly detailed, professional `mermaid` architecture diagram representing the entire target state.
+Enclose the mermaid diagram code within standard markdown code blocks (```mermaid ... ```).
+Use `graph TD` or `flowchart LR`.
+Use `subgraph` blocks to visually group resources by Region, VPC, Subnets, and Zones, closely mimicking a professional cloud topology diagram. Include Load Balancers, GKE clusters, Databases, Caches, and Message Queues as distinct nodes with appropriate icons or shapes if possible.
+
+CRITICAL MERMAID SYNTAX RULES:
+1. You MUST wrap ALL node labels AND subgraph titles in double quotes to prevent syntax errors (e.g., `id["Label (Extra Info)"]` or `subgraph "My Region (us-central1)"`). Do NOT use HTML tags in labels.
+2. The `mermaid` block MUST ONLY contain valid Mermaid syntax.
+3. Properly close all `subgraph` blocks with `end`.
+4. You MUST properly close the Mermaid block with triple backticks (```) BEFORE writing the architecture document. Do NOT put markdown text inside the Mermaid block.
+5. When connecting nodes, ALWAYS use the Node ID, never just a label. Correct: `A --> B`. Incorrect: `A --> "Some Label"`.
+6. Use ONLY valid arrow types: `-->`, `---`, or `-.->`. DO NOT use `<--` or `<-->`.
+7. Node IDs must be alphanumeric without spaces or special characters. Do not use dashes or parentheses in Node IDs.
+
+After the diagram, provide a detailed architecture document with these sections. Use ONLY {cloud_provider} service names:
 
 ## 1. Executive Summary
 ## 2. Network Architecture (VPC/VNET design, subnets, firewall rules)

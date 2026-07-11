@@ -176,47 +176,56 @@ No markdown fences. No explanation. ONLY valid JSON array."""
         BATCH_SIZE = 34  # Balance between speed (3 batches instead of 10) and JSON reliability
         all_mappings = []
 
-        for i in range(0, len(servers_list), BATCH_SIZE):
-            batch = servers_list[i:i + BATCH_SIZE]
-            batch_num = i // BATCH_SIZE + 1
-            total_batches = (len(servers_list) + BATCH_SIZE - 1) // BATCH_SIZE
-            print(f"  AI analyzing batch {batch_num}/{total_batches} ({len(batch)} servers)...")
-
-            ai_result = self._ai_recommend_services(batch, db_map)
-
-            if ai_result:
-                for rec in ai_result:
-                    target_config = rec.get("target_config", {})
-                    if isinstance(target_config, dict):
-                        target_config = json.dumps(target_config)
-
-                    os_name = next((s['os'] for s in batch if s['server_id'] == rec.get('server_id')), 'Unknown')
-                    all_mappings.append({
-                        "mapping_id": f"map-{len(all_mappings):04d}",
-                        "source_component_id": rec.get("server_id", "unknown"),
-                        "source_component_type": "server",
-                        "source_technology": f"VMware VM ({os_name})",
-                        "target_gcp_service": rec.get("target_gcp_service", "compute-engine"),
-                        "target_gcp_machine": rec.get("target_gcp_machine", "n2-standard-2"),
-                        "target_gcp_cost": float(rec.get("target_gcp_cost", 48.50)),
-                        "target_aws_service": rec.get("target_aws_service", "Amazon EC2"),
-                        "target_aws_machine": rec.get("target_aws_machine", "t3.large"),
-                        "target_aws_cost": float(rec.get("target_aws_cost", 48.50)),
-                        "target_azure_service": rec.get("target_azure_service", "Azure Virtual Machines"),
-                        "target_azure_machine": rec.get("target_azure_machine", "Standard_D2s_v3"),
-                        "target_azure_cost": float(rec.get("target_azure_cost", 48.50)),
-                        "target_region": "us-central1",
-                        "rightsizing_recommendation": rec.get("rightsizing_recommendation", "Retained original specs."),
-                        "ai_reasoning": rec.get("ai_reasoning", "AI-recommended mapping."),
-                        "project_id": self.project_id
-                    })
-            else:
-                print(f"  Gemini failed for batch, using fallback heuristics...")
-                for srv in batch:
-                    mapping = self._fallback_mapping(srv, db_map)
-                    if mapping:
-                        mapping["mapping_id"] = f"map-{len(all_mappings):04d}"
-                        all_mappings.append(mapping)
+        # For huge datasets, bypass LLM batching for performance and use heuristics
+        if len(servers_list) > 1000:
+            print(f"  Dataset is large ({len(servers_list)} servers). Bypassing LLM batching and using high-speed heuristics...")
+            for srv in servers_list:
+                mapping = self._fallback_mapping(srv, db_map)
+                if mapping:
+                    mapping["mapping_id"] = f"map-{len(all_mappings):04d}"
+                    all_mappings.append(mapping)
+        else:
+            for i in range(0, len(servers_list), BATCH_SIZE):
+                batch = servers_list[i:i + BATCH_SIZE]
+                batch_num = i // BATCH_SIZE + 1
+                total_batches = (len(servers_list) + BATCH_SIZE - 1) // BATCH_SIZE
+                print(f"  AI analyzing batch {batch_num}/{total_batches} ({len(batch)} servers)...")
+    
+                ai_result = self._ai_recommend_services(batch, db_map)
+    
+                if ai_result:
+                    for rec in ai_result:
+                        target_config = rec.get("target_config", {})
+                        if isinstance(target_config, dict):
+                            target_config = json.dumps(target_config)
+    
+                        os_name = next((s['os'] for s in batch if s['server_id'] == rec.get('server_id')), 'Unknown')
+                        all_mappings.append({
+                            "mapping_id": f"map-{len(all_mappings):04d}",
+                            "source_component_id": rec.get("server_id", "unknown"),
+                            "source_component_type": "server",
+                            "source_technology": f"VMware VM ({os_name})",
+                            "target_gcp_service": rec.get("target_gcp_service", "compute-engine"),
+                            "target_gcp_machine": rec.get("target_gcp_machine", "n2-standard-2"),
+                            "target_gcp_cost": float(rec.get("target_gcp_cost", 48.50)),
+                            "target_aws_service": rec.get("target_aws_service", "Amazon EC2"),
+                            "target_aws_machine": rec.get("target_aws_machine", "t3.large"),
+                            "target_aws_cost": float(rec.get("target_aws_cost", 48.50)),
+                            "target_azure_service": rec.get("target_azure_service", "Azure Virtual Machines"),
+                            "target_azure_machine": rec.get("target_azure_machine", "Standard_D2s_v3"),
+                            "target_azure_cost": float(rec.get("target_azure_cost", 48.50)),
+                            "target_region": "us-central1",
+                            "rightsizing_recommendation": rec.get("rightsizing_recommendation", "Retained original specs."),
+                            "ai_reasoning": rec.get("ai_reasoning", "AI-recommended mapping."),
+                            "project_id": self.project_id
+                        })
+                else:
+                    print(f"  Gemini failed for batch, using fallback heuristics...")
+                    for srv in batch:
+                        mapping = self._fallback_mapping(srv, db_map)
+                        if mapping:
+                            mapping["mapping_id"] = f"map-{len(all_mappings):04d}"
+                            all_mappings.append(mapping)
 
         # Write to BigQuery - target_architecture (full details for UI)
         table_ref = client.dataset(self.dataset).table("target_architecture")

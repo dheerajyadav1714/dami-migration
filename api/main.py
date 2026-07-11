@@ -75,6 +75,44 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process inventory: {str(e)}")
 
+@app.post("/api/upload/diagram")
+async def upload_diagram(
+    file: UploadFile = File(...)
+):
+    """Upload an architecture diagram image for Gemini Vision analysis."""
+    print(f"Received diagram upload '{file.filename}'...")
+    
+    temp_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "seed")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, f"diagram_{file.filename}")
+    
+    try:
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        from agents.intake import IntakeAgent
+        agent = IntakeAgent()
+        result = agent.read_architecture_diagram(temp_path)
+        
+        # Store analysis in BigQuery
+        stored = False
+        try:
+            from agents.architecture_designer import ArchitectureDesignerAgent
+            designer = ArchitectureDesignerAgent()
+            stored = designer.store_diagram_analysis(result, file.filename)
+        except Exception as store_err:
+            print(f"Diagram storage failed (non-fatal): {store_err}")
+        
+        return {
+            "status": "success",
+            "message": f"Analyzed {len(result.get('components', []))} components and {len(result.get('connections', []))} connections.",
+            "analysis": result,
+            "stored_to_bq": stored
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to analyze diagram: {str(e)}")
+
 @app.post("/api/run-agent")
 def run_agent(req: AgentRunRequest):
     print(f"Triggering phase '{req.phase}' for project '{req.project_id}'...")
@@ -97,16 +135,24 @@ def run_agent(req: AgentRunRequest):
             return {"status": "success", "message": f"Assessed and categorized {res['assessed_count']} servers."}
             
         elif req.phase == "assess_and_plan":
-            from agents.dependency_mapper import run_dependency_mapper
-            from agents.risk_scorer import run_risk_scorer
-            from agents.architecture_designer import run_architecture_designer
-            from agents.wave_planner import run_wave_planner
+            from agents.orchestrator import (
+                run_dependency_mapper,
+                run_risk_scorer,
+                run_architecture_designer,
+                run_wave_planner
+            )
             
-            run_dependency_mapper()
-            run_risk_scorer()
-            run_architecture_designer()
-            res = run_wave_planner()
-            return {"status": "success", "message": res}
+            results = []
+            results.append(run_dependency_mapper())
+            results.append(run_risk_scorer())
+            results.append(run_architecture_designer())
+            results.append(run_wave_planner())
+            return {"status": "success", "message": " | ".join(results)}
+            
+        elif req.phase == "wave":
+            agent = WavePlannerAgent()
+            res = agent.create_migration_waves()
+            return {"status": "success", "message": f"Scheduled workloads into {res['waves_count']} migration waves."}
             
         elif req.phase == "artifacts":
             from agents.artifacts_generator import ArtifactsGeneratorAgent

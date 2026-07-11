@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../lib/api';
-import axios from 'axios';
 import { 
   Plus, 
   Cloud, 
@@ -12,7 +11,12 @@ import {
   CheckCircle2,
   XCircle,
   X,
-  Play
+  Play,
+  Upload,
+  FileText,
+  Image,
+  Loader2,
+  Eye
 } from 'lucide-react';
 import {
   BarChart as RechartsBarChart,
@@ -39,33 +43,128 @@ export default function IngestionCenter() {
   });
 
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
+
+  // Upload state
+  const [inventoryFile, setInventoryFile] = useState(null);
+  const [sourceType, setSourceType] = useState('vmware');
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
+  const inventoryInputRef = useRef(null);
+
+  // Diagram upload state
+  const [diagramFile, setDiagramFile] = useState(null);
+  const [diagramPreview, setDiagramPreview] = useState(null);
+  const [analyzingDiagram, setAnalyzingDiagram] = useState(false);
+  const [diagramResult, setDiagramResult] = useState(null);
+  const diagramInputRef = useRef(null);
+
+  // Pipeline state
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelineResult, setPipelineResult] = useState(null);
+
+  // Seed state
+  const [seeding, setSeeding] = useState(false);
+
+  const uploadSectionRef = useRef(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [qualRes, hygRes] = await Promise.all([
-          api.get('/api/ingestion/quality').catch(() => ({data: {}})),
-          api.get('/api/ingestion/zombies').catch(() => ({data: {zombies: [], ip_conflicts: []}}))
-        ]);
-        
-        if (qualRes.data.overall_score !== undefined) setQuality(qualRes.data);
-        if (hygRes.data.zombies) setHygiene(hygRes.data);
-      } catch (error) {
-        console.error("Error fetching ingestion data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchData();
   }, []);
 
-  const runPipeline = async () => {
-    alert("Full Migration Pipeline (ASSESS -> PLAN) triggered successfully!");
+  const fetchData = async () => {
     try {
-      await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'assess_and_plan' });
-    } catch(e) {}
+      const [qualRes, hygRes] = await Promise.all([
+        api.get('/api/ingestion/quality').catch(() => ({data: {}})),
+        api.get('/api/ingestion/zombies').catch(() => ({data: {zombies: [], ip_conflicts: []}}))
+      ]);
+      
+      if (qualRes.data.overall_score !== undefined) setQuality(qualRes.data);
+      if (hygRes.data.zombies) setHygiene(hygRes.data);
+    } catch (error) {
+      console.error("Error fetching ingestion data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInventoryUpload = async () => {
+    if (!inventoryFile) return;
+    setUploading(true);
+    setUploadResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', inventoryFile);
+      formData.append('source_type', sourceType);
+      const res = await api.post('/api/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setUploadResult({ status: 'success', message: res.data.message || `Loaded ${res.data.loaded_count} servers.` });
+      // Refresh data
+      fetchData();
+    } catch (e) {
+      setUploadResult({ status: 'error', message: e.response?.data?.detail || 'Upload failed.' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDiagramUpload = async () => {
+    if (!diagramFile) return;
+    setAnalyzingDiagram(true);
+    setDiagramResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', diagramFile);
+      const res = await api.post('/api/upload/diagram', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setDiagramResult(res.data);
+    } catch (e) {
+      setDiagramResult({ status: 'error', message: e.response?.data?.detail || 'Diagram analysis failed.' });
+    } finally {
+      setAnalyzingDiagram(false);
+    }
+  };
+
+  const handleDiagramFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setDiagramFile(file);
+      setDiagramResult(null);
+      const reader = new FileReader();
+      reader.onload = (ev) => setDiagramPreview(ev.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const runPipeline = async () => {
+    setPipelineRunning(true);
+    setPipelineResult(null);
+    try {
+      const res = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'assess_and_plan' });
+      setPipelineResult({ status: res.data.status, message: res.data.message });
+    } catch (e) {
+      setPipelineResult({ status: 'error', message: e.response?.data?.detail || 'Pipeline execution failed.' });
+    } finally {
+      setPipelineRunning(false);
+    }
+  };
+
+  const seedDatabase = async () => {
+    setSeeding(true);
+    try {
+      const res = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'discovery' });
+      setUploadResult({ status: 'success', message: res.data.message });
+      fetchData();
+    } catch (e) {
+      setUploadResult({ status: 'error', message: 'Seeding failed.' });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const scrollToUpload = () => {
+    uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   if (loading) {
@@ -85,13 +184,156 @@ export default function IngestionCenter() {
                 <p className="text-slate-400 font-medium">Connect and manage your data sources to fuel migration intelligence.</p>
             </div>
             <button 
-              onClick={() => setShowAddModal(true)}
+              onClick={scrollToUpload}
               className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-lg shadow-[0_0_15px_rgba(79,70,229,0.4)] hover:bg-indigo-500 transition-colors"
             >
                 <Plus className="w-5 h-5" />
                 Add New Source
             </button>
         </header>
+
+        {/* UPLOAD SECTION */}
+        <div ref={uploadSectionRef} className="bg-[#131826] rounded-2xl p-6 border border-white/[0.05] shadow-lg mb-8">
+            <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
+               <Upload className="w-6 h-6 text-indigo-400" /> Data Ingestion & Upload
+            </h3>
+            <p className="text-slate-400 text-sm mb-6">Ingest raw data sources into D.A.M.I. using NVIDIA cuDF-accelerated pipelines. Supports VMware RVTools, AWS, Azure exports, and architecture diagrams.</p>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Upload Inventory */}
+                <div className="bg-[#0b0f19] rounded-xl p-5 border border-white/10">
+                    <div className="flex items-center gap-3 mb-4">
+                        <FileText className="w-5 h-5 text-emerald-400" />
+                        <h4 className="text-lg font-bold text-white">Upload Infrastructure Inventory</h4>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-4">Supported: VMware RVTools (CSV/Excel), AWS EC2 Inventory, Azure Resource exports, Device42 (JSON).</p>
+                    
+                    <div className="space-y-3">
+                        <div 
+                          onClick={() => inventoryInputRef.current?.click()}
+                          className="border-2 border-dashed border-slate-700 hover:border-indigo-500/50 rounded-xl p-4 text-center cursor-pointer transition-colors group"
+                        >
+                          <input 
+                            ref={inventoryInputRef}
+                            type="file" 
+                            accept=".csv,.xlsx,.xls,.json" 
+                            className="hidden" 
+                            onChange={(e) => { setInventoryFile(e.target.files[0]); setUploadResult(null); }}
+                          />
+                          <Upload className="w-8 h-8 text-slate-500 group-hover:text-indigo-400 mx-auto mb-2 transition-colors" />
+                          {inventoryFile ? (
+                            <p className="text-sm text-indigo-300 font-medium">{inventoryFile.name} <span className="text-slate-500">({(inventoryFile.size / 1024).toFixed(1)} KB)</span></p>
+                          ) : (
+                            <p className="text-sm text-slate-500">Click to select file • CSV, XLSX, JSON</p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <select 
+                              value={sourceType} 
+                              onChange={(e) => setSourceType(e.target.value)}
+                              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                            >
+                              <option value="vmware">VMware RVTools</option>
+                              <option value="aws">AWS EC2 Export</option>
+                              <option value="azure">Azure Resource Export</option>
+                              <option value="device42">Device42 (JSON)</option>
+                            </select>
+                            <button 
+                              onClick={handleInventoryUpload}
+                              disabled={!inventoryFile || uploading}
+                              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-lg text-sm transition-colors flex items-center gap-2"
+                            >
+                              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                              {uploading ? 'Loading...' : 'Upload & Ingest'}
+                            </button>
+                        </div>
+
+                        <div className="pt-2 border-t border-white/5">
+                            <p className="text-xs text-slate-500 mb-2">Quick Demo:</p>
+                            <button 
+                              onClick={seedDatabase}
+                              disabled={seeding}
+                              className="text-xs px-4 py-2 bg-amber-600/20 border border-amber-500/30 text-amber-400 hover:bg-amber-600/30 rounded-lg font-bold transition-colors flex items-center gap-2"
+                            >
+                              {seeding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Database className="w-3 h-3" />}
+                              {seeding ? 'Seeding...' : '⚡ Seed 100 VM Sample Dataset'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {uploadResult && (
+                      <div className={`mt-4 p-3 rounded-lg text-sm flex items-start gap-2 ${uploadResult.status === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' : 'bg-red-500/10 border border-red-500/20 text-red-300'}`}>
+                        {uploadResult.status === 'success' ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <XCircle className="w-4 h-4 mt-0.5 shrink-0" />}
+                        {uploadResult.message}
+                      </div>
+                    )}
+                </div>
+
+                {/* Upload Architecture Diagram */}
+                <div className="bg-[#0b0f19] rounded-xl p-5 border border-white/10">
+                    <div className="flex items-center gap-3 mb-4">
+                        <Image className="w-5 h-5 text-purple-400" />
+                        <h4 className="text-lg font-bold text-white">Upload Architecture Diagrams</h4>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-4">Upload JPEG/PNG of your current network/architecture topologies for Gemini Vision analysis.</p>
+                    
+                    <div className="space-y-3">
+                        <div 
+                          onClick={() => diagramInputRef.current?.click()}
+                          className="border-2 border-dashed border-slate-700 hover:border-purple-500/50 rounded-xl p-4 text-center cursor-pointer transition-colors group"
+                        >
+                          <input 
+                            ref={diagramInputRef}
+                            type="file" 
+                            accept=".png,.jpg,.jpeg" 
+                            className="hidden" 
+                            onChange={handleDiagramFileChange}
+                          />
+                          {diagramPreview ? (
+                            <img src={diagramPreview} alt="Diagram preview" className="max-h-32 mx-auto rounded-lg object-contain" />
+                          ) : (
+                            <>
+                              <Image className="w-8 h-8 text-slate-500 group-hover:text-purple-400 mx-auto mb-2 transition-colors" />
+                              <p className="text-sm text-slate-500">Click to select image • PNG, JPG</p>
+                            </>
+                          )}
+                        </div>
+
+                        <button 
+                          onClick={handleDiagramUpload}
+                          disabled={!diagramFile || analyzingDiagram}
+                          className="w-full px-5 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                        >
+                          {analyzingDiagram ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                          {analyzingDiagram ? 'Analyzing with Gemini Vision...' : '🔮 Analyze Diagram with Gemini Vision'}
+                        </button>
+                    </div>
+
+                    {diagramResult && (
+                      <div className="mt-4">
+                        {diagramResult.status === 'error' ? (
+                          <div className="p-3 rounded-lg text-sm bg-red-500/10 border border-red-500/20 text-red-300 flex items-start gap-2">
+                            <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                            {diagramResult.message}
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="p-3 rounded-lg text-sm bg-purple-500/10 border border-purple-500/20 text-purple-300 flex items-start gap-2">
+                              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                              {diagramResult.message} {diagramResult.stored_to_bq && '• Saved to BigQuery'}
+                            </div>
+                            <details className="bg-slate-900/50 rounded-lg border border-white/5">
+                              <summary className="p-3 text-xs text-slate-400 cursor-pointer hover:text-white font-bold">View Extracted Components ({diagramResult.analysis?.components?.length || 0})</summary>
+                              <pre className="p-3 text-xs text-slate-300 overflow-auto max-h-[200px] custom-scrollbar">{JSON.stringify(diagramResult.analysis, null, 2)}</pre>
+                            </details>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                </div>
+            </div>
+        </div>
 
         {/* DATA QUALITY DASHBOARD */}
         <div className="bg-[#131826] rounded-2xl p-6 border border-white/[0.05] shadow-lg mb-8">
@@ -107,12 +349,12 @@ export default function IngestionCenter() {
                 </div>
                 <div>
                     <div className="text-sm font-medium text-slate-400 mb-1">Field Completeness</div>
-                    <div className="text-3xl font-bold text-white mb-1">79.2%</div>
-                    <div className="text-xs font-bold text-emerald-400">↑ 24 fields analyzed</div>
+                    <div className="text-3xl font-bold text-white mb-1">{quality.overall_score}%</div>
+                    <div className="text-xs font-bold text-emerald-400">↑ {quality.completeness_data?.length || 0} fields analyzed</div>
                 </div>
                 <div>
                     <div className="text-sm font-medium text-slate-400 mb-1">Records Profiled</div>
-                    <div className="text-3xl font-bold text-white mb-1">{quality.records_profiled}</div>
+                    <div className="text-3xl font-bold text-white mb-1">{quality.records_profiled.toLocaleString()}</div>
                     <div className="text-xs font-bold text-emerald-400">↑ From BigQuery</div>
                 </div>
                 <div>
@@ -177,12 +419,12 @@ export default function IngestionCenter() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div>
                     <div className="text-sm font-medium text-slate-400 mb-1">Inventory Health Score</div>
-                    <div className="text-4xl font-bold text-white mb-1">82%</div>
+                    <div className="text-4xl font-bold text-white mb-1">{Math.max(0, 100 - Math.round(hygiene.zombies.length / Math.max(quality.records_profiled, 1) * 100))}%</div>
                     <div className="text-xs font-bold text-emerald-400 bg-emerald-500/10 inline-block px-2 py-1 rounded">↑ Target: 95%+</div>
                 </div>
                 <div>
                     <div className="text-sm font-medium text-slate-400 mb-1">Zombie VMs (Defunct)</div>
-                    <div className="text-4xl font-bold text-white mb-1">{hygiene.zombies.length} VMs</div>
+                    <div className="text-4xl font-bold text-white mb-1">{hygiene.zombies.length.toLocaleString()} VMs</div>
                     <div className="text-xs font-bold text-red-400 bg-red-500/10 inline-block px-2 py-1 rounded">↑ Retire Candidates</div>
                 </div>
                 <div>
@@ -195,10 +437,11 @@ export default function IngestionCenter() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div>
                     <p className="text-sm font-bold text-slate-200 mb-2 flex items-center gap-2">🧟 Zombie Virtual Machines (Defunct):</p>
-                    <p className="text-xs text-slate-400 mb-4 h-10">Active servers showing zero or negligible average utilization. Recommended to shut down and retire to achieve instant 100% cost savings.</p>
-                    <div className="overflow-x-auto rounded-lg border border-white/10">
+                    <p className="text-xs text-slate-400 mb-2">Active servers showing zero or negligible average utilization. Recommended to shut down and retire to achieve instant 100% cost savings.</p>
+                    <p className="text-xs text-slate-500 mb-3">Showing {hygiene.zombies.length.toLocaleString()} zombie VMs</p>
+                    <div className="max-h-[300px] overflow-y-auto overflow-x-auto rounded-lg border border-white/10 custom-scrollbar">
                         <table className="w-full text-xs text-left">
-                            <thead className="text-slate-400 bg-slate-900 border-b border-white/10">
+                            <thead className="text-slate-400 bg-slate-900 border-b border-white/10 sticky top-0 z-10">
                                 <tr>
                                     <th className="p-3 font-semibold">server_id</th>
                                     <th className="p-3 font-semibold">name</th>
@@ -317,77 +560,46 @@ export default function IngestionCenter() {
         {/* RUN PIPELINE */}
         <div className="mb-8">
             <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-               <RefreshCw className="w-6 h-6 text-indigo-400" /> Run Full Migration Pipeline
+               <RefreshCw className={`w-6 h-6 text-indigo-400 ${pipelineRunning ? 'animate-spin' : ''}`} /> Run Full Migration Pipeline
             </h3>
             <p className="text-slate-400 text-sm mb-6">After ingesting data, run the complete ASSESS → PLAN pipeline in one click. This chains: Dependency Mapper → Risk Scorer → Architecture Designer → Wave Planner.</p>
             <button 
               onClick={runPipeline}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white py-4 rounded-xl font-bold text-lg shadow-[0_0_25px_rgba(99,102,241,0.5)] transition-all flex justify-center items-center gap-3"
+              disabled={pipelineRunning}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-400 text-white py-4 rounded-xl font-bold text-lg shadow-[0_0_25px_rgba(99,102,241,0.5)] transition-all flex justify-center items-center gap-3"
             >
-                <Play className="w-6 h-6 fill-current" /> Run Full Pipeline (ASSESS → PLAN)
+                {pipelineRunning ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    Running Pipeline... (this may take 1-2 minutes)
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-6 h-6 fill-current" /> Run Full Pipeline (ASSESS → PLAN)
+                  </>
+                )}
             </button>
-        </div>
 
-
-        {/* MODAL (Add Source) */}
-        {showAddModal && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-                <div className="bg-[#131826] rounded-2xl w-full max-w-lg border border-white/10 shadow-2xl overflow-hidden relative">
-                    <button 
-                      onClick={() => setShowAddModal(false)}
-                      className="absolute top-4 right-4 text-slate-400 hover:text-white"
-                    >
-                        <X className="w-6 h-6" />
-                    </button>
-                    <div className="p-6 border-b border-white/5">
-                        <h3 className="text-xl font-bold text-white">Add New Data Source</h3>
-                        <p className="text-sm text-slate-400 mt-1">Select an integration provider to sync inventory.</p>
-                    </div>
-                    <div className="p-6 space-y-3 bg-[#0b0f19]">
-                        <button 
-                          className="w-full flex items-center p-4 bg-slate-900/50 rounded-xl border border-slate-800 hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all text-left group"
-                          onClick={() => { alert('Connecting to Amazon Web Services...'); setShowAddModal(false); }}
-                        >
-                            <Cloud className="w-8 h-8 text-orange-400 mr-4" />
-                            <div>
-                                <div className="font-bold text-white group-hover:text-indigo-300">Amazon Web Services</div>
-                                <div className="text-xs text-slate-400">Sync EC2, RDS, and VPC data</div>
-                            </div>
-                        </button>
-                        <button 
-                          className="w-full flex items-center p-4 bg-slate-900/50 rounded-xl border border-slate-800 hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all text-left group"
-                          onClick={() => { alert('Connecting to Microsoft Azure...'); setShowAddModal(false); }}
-                        >
-                            <Cloud className="w-8 h-8 text-blue-400 mr-4" />
-                            <div>
-                                <div className="font-bold text-white group-hover:text-indigo-300">Microsoft Azure</div>
-                                <div className="text-xs text-slate-400">Sync VMs, SQL, and VNet data</div>
-                            </div>
-                        </button>
-                        <button 
-                          className="w-full flex items-center p-4 bg-slate-900/50 rounded-xl border border-slate-800 hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all text-left group"
-                          onClick={() => { alert('Connecting to VMware vSphere...'); setShowAddModal(false); }}
-                        >
-                            <Server className="w-8 h-8 text-emerald-400 mr-4" />
-                            <div>
-                                <div className="font-bold text-white group-hover:text-indigo-300">VMware vSphere</div>
-                                <div className="text-xs text-slate-400">Sync Datacenter inventory directly via vCenter</div>
-                            </div>
-                        </button>
-                        <button 
-                          className="w-full flex items-center p-4 bg-slate-900/50 rounded-xl border border-slate-800 hover:bg-indigo-600/20 hover:border-indigo-500/50 transition-all text-left group"
-                          onClick={() => { alert('Opening CSV Uploader...'); setShowAddModal(false); }}
-                        >
-                            <Database className="w-8 h-8 text-teal-400 mr-4" />
-                            <div>
-                                <div className="font-bold text-white group-hover:text-indigo-300">CSV / Manual Upload</div>
-                                <div className="text-xs text-slate-400">Upload generic export files (RVTools, etc.)</div>
-                            </div>
-                        </button>
-                    </div>
+            {pipelineResult && (
+              <div className={`mt-4 p-4 rounded-xl text-sm ${pipelineResult.status === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20' : pipelineResult.status === 'partial' ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
+                <div className="flex items-start gap-3">
+                  {pipelineResult.status === 'success' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
+                  ) : pipelineResult.status === 'partial' ? (
+                    <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+                  )}
+                  <div>
+                    <p className="font-bold text-white mb-1">
+                      {pipelineResult.status === 'success' ? 'Pipeline Completed Successfully!' : pipelineResult.status === 'partial' ? 'Pipeline Completed with Warnings' : 'Pipeline Failed'}
+                    </p>
+                    <p className="text-slate-300">{pipelineResult.message}</p>
+                  </div>
                 </div>
-            </div>
-        )}
+              </div>
+            )}
+        </div>
 
     </main>
   );

@@ -218,11 +218,14 @@ class DiscoveryAgent:
         # Clear existing servers
         client.query(f"DELETE FROM `{table_id}` WHERE 1=1").result()
         
-        errors = client.insert_rows_json(table_id, normalized_servers)
-        if errors:
-            raise Exception(f"BigQuery insertion errors: {errors}")
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND
+        )
+        
+        load_job = client.load_table_from_json(normalized_servers, table_id, job_config=job_config)
+        load_job.result()  # Wait for the job to complete
             
-        print(f"Loaded {len(normalized_servers)} normalized servers into BigQuery.")
+        print(f"Loaded {len(normalized_servers)} normalized servers into BigQuery using batch load.")
         return {"loaded_count": len(normalized_servers)}
 
 if __name__ == "__main__":

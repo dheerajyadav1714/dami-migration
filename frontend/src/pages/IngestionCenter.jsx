@@ -60,7 +60,46 @@ export default function IngestionCenter() {
 
   // Pipeline state
   const [pipelineRunning, setPipelineRunning] = useState(false);
-  const [pipelineResult, setPipelineResult] = useState(null);
+  const [pipelineStep, setPipelineStep] = useState('');
+  const [pipelineResultsList, setPipelineResultsList] = useState([]);
+
+  const runPipeline = async () => {
+    setPipelineRunning(true);
+    setPipelineResultsList([]);
+    setPipelineStep('dependency');
+    
+    try {
+      // Step 1: Dependency
+      const resDep = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'dependency' });
+      setPipelineResultsList(prev => [...prev, { phase: 'Dependency Mapper', status: resDep.data.status, message: resDep.data.message }]);
+      
+      // Step 2: Risk
+      setPipelineStep('risk');
+      const resRisk = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'risk' });
+      setPipelineResultsList(prev => [...prev, { phase: 'Risk Scorer', status: resRisk.data.status, message: resRisk.data.message }]);
+      
+      // Step 3: Architecture
+      setPipelineStep('architecture');
+      const resArch = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'architecture' });
+      setPipelineResultsList(prev => [...prev, { phase: 'Architecture Designer', status: resArch.data.status, message: resArch.data.message }]);
+      
+      // Step 4: Wave
+      setPipelineStep('wave');
+      const resWave = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'wave' });
+      setPipelineResultsList(prev => [...prev, { phase: 'Wave Planner', status: resWave.data.status, message: resWave.data.message }]);
+
+      setPipelineStep('complete');
+    } catch (e) {
+      setPipelineResultsList(prev => [...prev, { 
+        phase: 'Error', 
+        status: 'error', 
+        message: e.response?.data?.detail || 'Pipeline execution failed or timed out.' 
+      }]);
+      setPipelineStep('error');
+    } finally {
+      setPipelineRunning(false);
+    }
+  };
 
   // Seed state
   const [seeding, setSeeding] = useState(false);
@@ -134,19 +173,6 @@ export default function IngestionCenter() {
       const reader = new FileReader();
       reader.onload = (ev) => setDiagramPreview(ev.target.result);
       reader.readAsDataURL(file);
-    }
-  };
-
-  const runPipeline = async () => {
-    setPipelineRunning(true);
-    setPipelineResult(null);
-    try {
-      const res = await api.post('/api/run-agent', { project_id: 'proj-migration-001', phase: 'assess_and_plan' });
-      setPipelineResult({ status: res.data.status, message: res.data.message });
-    } catch (e) {
-      setPipelineResult({ status: 'error', message: e.response?.data?.detail || 'Pipeline execution failed.' });
-    } finally {
-      setPipelineRunning(false);
     }
   };
 
@@ -571,7 +597,10 @@ export default function IngestionCenter() {
                 {pipelineRunning ? (
                   <>
                     <Loader2 className="w-6 h-6 animate-spin" />
-                    Running Pipeline... (this may take 1-2 minutes)
+                    {pipelineStep === 'dependency' && 'Step 1/4: Mapping Dependencies...'}
+                    {pipelineStep === 'risk' && 'Step 2/4: Scoring Risks...'}
+                    {pipelineStep === 'architecture' && 'Step 3/4: Designing Architecture...'}
+                    {pipelineStep === 'wave' && 'Step 4/4: Planning Waves...'}
                   </>
                 ) : (
                   <>
@@ -580,23 +609,32 @@ export default function IngestionCenter() {
                 )}
             </button>
 
-            {pipelineResult && (
-              <div className={`mt-4 p-4 rounded-xl text-sm ${pipelineResult.status === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20' : pipelineResult.status === 'partial' ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
-                <div className="flex items-start gap-3">
-                  {pipelineResult.status === 'success' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
-                  ) : pipelineResult.status === 'partial' ? (
-                    <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
-                  )}
-                  <div>
-                    <p className="font-bold text-white mb-1">
-                      {pipelineResult.status === 'success' ? 'Pipeline Completed Successfully!' : pipelineResult.status === 'partial' ? 'Pipeline Completed with Warnings' : 'Pipeline Failed'}
-                    </p>
-                    <p className="text-slate-300">{pipelineResult.message}</p>
+            {pipelineResultsList.length > 0 && (
+              <div className="mt-6 space-y-3">
+                {pipelineResultsList.map((res, i) => (
+                  <div key={i} className={`p-4 rounded-xl text-sm ${res.status === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20' : res.status === 'partial' ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
+                    <div className="flex items-start gap-3">
+                      {res.status === 'success' ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
+                      ) : res.status === 'partial' ? (
+                        <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-bold text-white mb-1">{res.phase}</p>
+                        <p className="text-slate-300">{res.message}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
+                
+                {pipelineStep === 'complete' && (
+                  <div className="p-4 rounded-xl text-sm bg-indigo-500/10 border border-indigo-500/20">
+                    <p className="font-bold text-indigo-400">🎉 Pipeline Complete!</p>
+                    <p className="text-slate-300">Data has been updated in BigQuery. Check the Target Architecture, Risk Assessment, and Wave Plan pages.</p>
+                  </div>
+                )}
               </div>
             )}
         </div>

@@ -149,6 +149,16 @@ def run_agent(req: AgentRunRequest):
             results.append(run_wave_planner())
             return {"status": "success", "message": " | ".join(results)}
             
+        elif req.phase == "dependency":
+            from agents.orchestrator import run_dependency_mapper
+            res = run_dependency_mapper()
+            return {"status": "success", "message": res}
+            
+        elif req.phase == "architecture":
+            from agents.orchestrator import run_architecture_designer
+            res = run_architecture_designer()
+            return {"status": "success", "message": res}
+            
         elif req.phase == "wave":
             agent = WavePlannerAgent()
             res = agent.create_migration_waves()
@@ -166,7 +176,7 @@ def run_agent(req: AgentRunRequest):
             }
             
         else:
-            raise HTTPException(status_code=400, detail="Invalid phase type. Select: discovery, risk, wave, artifacts")
+            raise HTTPException(status_code=400, detail="Invalid phase type. Select: discovery, dependency, risk, architecture, wave, artifacts, assess_and_plan")
             
     except Exception as e:
         print(f"Agent execution error for phase '{req.phase}': {e}")

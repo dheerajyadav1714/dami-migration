@@ -446,7 +446,7 @@ feedback_agent = Agent(
 
 # Workflow DAG: defines the migration pipeline execution graph
 # START → Assessment (parallel) → Architecture → Waves → Deploy → Feedback
-from google.adk.workflow._graph import START
+from google.adk.workflow import START
 
 migration_workflow = Workflow(
     name="migration_pipeline",

@@ -201,9 +201,11 @@ Return a JSON object with:
 
         # Determine app attributes
         app_attrs = {}
+        server_env_map = dict(zip(servers_df['server_id'], servers_df['environment']))
+        
         for app_id, srv_ids in app_srvs.items():
-            envs = [servers_df.loc[servers_df["server_id"] == s, "environment"].values[0] for s in srv_ids if not servers_df.loc[servers_df["server_id"] == s, "environment"].empty]
-            is_prod = any(e.lower() in ["prod", "production"] for e in envs) if envs else True
+            envs = [server_env_map[s] for s in srv_ids if s in server_env_map]
+            is_prod = any(str(e).lower() in ["prod", "production"] for e in envs) if envs else True
             
             scores = [risk_map.get(s, {}).get("overall_risk_score", 5.0) for s in srv_ids]
             max_score = max(scores) if scores else 5.0
